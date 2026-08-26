@@ -17,14 +17,14 @@ workflow:
   default_policy: native
 
 current:
-  stage: V1-S0
-  task_id: V1-S0-T02
-  task_path: company/tasks/v1-s0/V1-S0-T02-STOCK-RUNTIME-SMOKE.md
-  status: planned
+  stage: V1-S1
+  task_id: V1-S1-T01
+  task_path: company/tasks/v1-s1/V1-S1-T01-GLM-PROVIDER-CHECK.md
+  status: ready_internal
 
 next: null
 
 validation:
   last_internal_commit: 97b73a9f4e1fb23d406bb987d0785cefa1f99966
-  last_passed_gate: BOOT
-  last_gate_commit: b05567891e15a157d8e54fac627618f8214128a7
+  last_passed_gate: V1-S0
+  last_gate_commit: 97b73a9f4e1fb23d406bb987d0785cefa1f99966

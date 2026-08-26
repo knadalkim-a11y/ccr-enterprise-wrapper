@@ -3,7 +3,7 @@ id: V1-S0-T02
 stage: V1-S0
 title: Stock CCR internal Windows runtime smoke
 kind: spike
-status: planned
+status: done
 session_role: validation
 internal_validation: required
 depends_on:
@@ -16,7 +16,7 @@ forbidden_paths:
   - packages/**
   - package.json
   - package-lock.json
-human_decision: pending
+human_decision: accepted
 ---
 
 # Stock CCR Internal Windows Runtime Smoke
@@ -58,15 +58,15 @@ Provider contract로 넘어가기 전에 Stock CCR 자체의 최소 실행 가�
 
 ## Acceptance criteria
 
-- [ ] exact product commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966` 사용 또는 동등한 product tree임을 기록
-- [ ] working tree clean
-- [ ] source-built CLI entrypoint 존재
-- [ ] CLI `--help` exit `0`
-- [ ] `start --no-open --no-gateway` exit `0`
-- [ ] `%APPDATA%\claude-code-router` 존재 여부 기록
-- [ ] `stop` exit `0`
-- [ ] 제품 코드와 lockfile 무변경
-- [ ] authenticated management URL/token을 외부 Evidence에 기록하지 않음
+- [x] exact product commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966` 사용 또는 동등한 product tree임을 기록
+- [x] working tree clean
+- [x] source-built CLI entrypoint 존재
+- [x] CLI `--help` exit `0`
+- [x] `start --no-open --no-gateway` exit `0`
+- [x] `%APPDATA%\claude-code-router` 존재 여부 기록
+- [x] `stop` exit `0`
+- [x] 제품 코드와 lockfile 무변경
+- [x] authenticated management URL/token을 외부 Evidence에 기록하지 않음
 
 ## Windows commands
 
@@ -85,16 +85,6 @@ $Cli = "packages/cli/dist/main/cli.js"
 Test-Path $Cli
 ```
 
-진행 조건:
-
-```text
-TestedCommit = 97b73a9f4e1fb23d406bb987d0785cefa1f99966
-또는 해당 commit과 product-controlled tree가 동일함
-process.platform = win32
-working tree = clean
-$Cli exists = True
-```
-
 CLI entrypoint 확인:
 
 ```powershell
@@ -105,13 +95,14 @@ $HelpExit = $LASTEXITCODE
 Provider와 gateway 없이 최소 service start/stop:
 
 ```powershell
+$CcrData = Join-Path $env:APPDATA "claude-code-router"
+$DataDirExistedBefore = Test-Path $CcrData
+
 node $Cli start --no-open --no-gateway
 $StartExit = $LASTEXITCODE
 
 Start-Sleep -Seconds 2
-
-$CcrData = Join-Path $env:APPDATA "claude-code-router"
-$DataDirExists = Test-Path $CcrData
+$DataDirExistsAfter = Test-Path $CcrData
 
 node $Cli stop
 $StopExit = $LASTEXITCODE
@@ -164,18 +155,38 @@ exit code, data directory 존재 여부, sanitized observation만 기록한다.
 
 | Attempt | Session role | Commit | Internal | Recommendation |
 |---:|---|---|---|---|
+| 1 | validation | `97b73a9f4e1fb23d406bb987d0785cefa1f99966` | `PASS` — CLI help, management-only start/stop, runtime path, product diff 모두 통과 | `GO` — accept V1-S0 Gate and proceed to V1-S1 |
+
+## Attempt 1 evidence
+
+- Task: `V1-S0-T02`
+- Tested product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Environment: same internal Windows baseline as `V1-S0-T01` — Microsoft Windows 11 Enterprise reported as `10.0.2231`, Node `v24.15.0`, npm `11.12.1`, `win32`, `x64`
+- Working tree before test: `CLEAN`
+- CLI entrypoint exists: `TRUE`
+- CLI help: `PASS`, exit `0`
+- Runtime data directory existed before: `FALSE`
+- Management-only start: `PASS`, exit `0`
+- Runtime data directory exists after: `TRUE`
+- Stop: `PASS`, exit `0`
+- Product diff: `PASS`, exit `0`
+- Final Git status: `CLEAN` — no output
+- Failure classification: `N/A`
+- Reproducibility: `1/1`
+- Sanitized observation: 기존 clean checkout에서 CLI 존재 확인부터 help, management-only start/stop, 제품 파일 diff까지 전 항목이 한 번에 예상대로 통과했다. runtime data directory는 최초 실행 시 새로 생성되었고 서비스 종료 후에도 source tree에는 변경이 남지 않았다.
+- Security evidence: authenticated management URL, query token, runtime database content, internal absolute paths를 외부 기록에 포함하지 않았다.
 
 ## Evidence / limitations
 
-- Build-validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Build-validated and runtime-tested product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - `V1-S0-T01` passed on internal Windows with Node `v24.15.0`, npm `11.12.1`, `win32`, `x64`.
-- This Task intentionally starts management-only mode with `--no-gateway`; it does not prove provider or model request compatibility.
-- A PASS here completes the minimum Stock CCR install/build/start evidence required for the V1-S0 Gate.
+- This Task intentionally used management-only mode with `--no-gateway`; it does not prove provider, model, gateway request, streaming, or tool compatibility.
+- Together, `V1-S0-T01` and `V1-S0-T02` satisfy the minimum Stock CCR install/build/start/stop evidence for the V1-S0 Gate.
 
 ## Codex recommendation
 
-`PENDING`
+`GO` — accept the V1-S0 Gate and begin V1-S1 with one internal GLM provider connection check. Do not infer streaming, tool calling, or Claude Code compatibility from this smoke test.
 
 ## Human decision
 
-`PENDING`
+`ACCEPTED` — `V1-S0-T02` internal Windows runtime smoke passed on `2026-08-27`.
