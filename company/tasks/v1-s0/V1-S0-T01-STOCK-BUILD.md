@@ -3,7 +3,7 @@ id: V1-S0-T01
 stage: V1-S0
 title: Stock CCR internal Windows build
 kind: spike
-status: planned
+status: ready_internal
 session_role: validation
 internal_validation: required
 depends_on:
