@@ -103,7 +103,7 @@ npm run build:assets
 - Attempt 1 environment: Node `v26.4.0`, npm `11.19.0`, `android`/`arm64`, Linux kernel `6.6.102-android15` under Termux.
 - Clean install: `BLOCKED` — `npm ci` exited `1`. `better-sqlite3@12.11.1` had no prebuilt binary for Node `26.4.0` on `android`/`arm64`; its fallback `node-gyp` configure failed because `android_ndk_path` was undefined.
 - Classification: environment/native dependency compatibility. The failure does not establish a pinned source or lockfile defect.
-- Stop condition triggered: native dependency resolution failed in the available external environment. `npm run typecheck` and `npm run build:assets` were not run because the install was incomplete; running them would not be valid evidence.
+- Stop condition handling: Android/Termux is not an upstream-documented supported source-build host, and native dependency resolution failed in the available environment. This attempt stopped without a source workaround; whether the native dependency resolves on a supported host remains untested. `npm run typecheck` and `npm run build:assets` were not run because the install was incomplete; running them would not be valid evidence.
 - Product code diff after the failed install: `PASS` — `packages/**`, `package.json`, and `package-lock.json` remained unchanged.
 - Limitation: the Validation question remains unanswered until the same stock commands pass on a supported Node 22+ host environment.
 
