@@ -21,6 +21,7 @@
 - Active Task: `V1-S0-T01`
 - Status: `READY_FOR_INTERNAL_VALIDATION`
 - Goal: Company 변경 없이 Stock CCR `v3.0.22`가 사내 Windows에서 install/typecheck/build되는지 검증
+- Node policy: upstream `>=22`를 만족하는 LTS major 사용; 현재 Node 22 또는 Node 24 허용
 
 ## Confirmed facts
 
@@ -33,7 +34,7 @@
 | Integration merge ancestry | PASS | merge base with final main is `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` |
 | CCR repository structure | PASS | `package.json`, `packages/`, `build/`, `docs/`, `LICENSE`, `company/` present |
 | Native Termux build attempt | BLOCKED_ENVIRONMENT | Attempt 1 failed at Android/arm64 native dependency install; PR #8 preserved the evidence |
-| Stock CCR internal Windows build | READY_FOR_INTERNAL_VALIDATION | Active Task `V1-S0-T01`; Node 22 + clean `npm ci` + typecheck + build:assets pending |
+| Stock CCR internal Windows build | READY_FOR_INTERNAL_VALIDATION | Active Task `V1-S0-T01`; supported Node LTS `>=22` + clean `npm ci` + typecheck + build:assets pending |
 | Stock CCR Windows execution | UNVERIFIED | follow-up V1-S0 validation after build |
 | Internal provider contract | UNVERIFIED | pending V1-S1 on internal Windows |
 | Claude Code E2E | UNVERIFIED | pending V1-S2 on internal Windows |
@@ -58,6 +59,7 @@
 
 - Imported upstream workflows are not yet approved for this repository. Keep GitHub Actions disabled.
 - 사내 Windows에서 dependency 설치가 네트워크/registry 정책으로 차단될 수 있다. 이 경우 제품 결함과 분리해 기록한다.
+- Node 24에서만 native dependency 또는 build failure가 발생하면 Node major compatibility 가능성을 분리해 기록하고, 필요한 경우에만 Node 22 비교 검증을 수행한다.
 - Stock CCR build와 runtime은 아직 사내 Windows에서 검증되지 않았다.
 
 ## Last passed gate
@@ -69,8 +71,9 @@
 
 ## Next action
 
-1. Native Termux에서 repository를 최신 `main`으로 동기화하고 임시 `AI_WORK_REPORT.md`를 정리한다.
-2. 사내 Windows에서 최신 승인 `main`의 exact commit을 pull한다.
-3. Node 22로 `npm ci`, `npm run typecheck`, `npm run build:assets`를 변경 없이 실행한다.
+1. 사내 Windows working tree가 clean이고 `process.platform=win32`, `process.arch=x64`인지 확인한다.
+2. 설치된 Node가 upstream `>=22`를 만족하는 LTS major인지 확인한다. Node 24 LTS는 허용한다.
+3. 현재 설치된 지원 LTS 환경에서 `npm ci`, `npm run typecheck`, `npm run build:assets`를 변경 없이 실행한다.
 4. 사내에서는 수정하지 않고 command/exit code/분류/sanitized observation만 외부에 반환한다.
-5. 결과를 같은 `V1-S0-T01`의 Attempt 2로 기록한다.
+5. Node-major-specific failure 증거가 있을 때만 Node 22 비교 재검증을 고려한다.
+6. 결과를 같은 `V1-S0-T01`의 Attempt 2로 기록한다.
