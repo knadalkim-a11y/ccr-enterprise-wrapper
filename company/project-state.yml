@@ -20,7 +20,7 @@ current:
   stage: V1-S0
   task_id: V1-S0-T01
   task_path: company/tasks/v1-s0/V1-S0-T01-STOCK-BUILD.md
-  status: planned
+  status: ready_internal
 
 next: null
 
