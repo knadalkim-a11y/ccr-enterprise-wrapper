@@ -3,7 +3,7 @@ id: V1-S0-T01
 stage: V1-S0
 title: Stock CCR external build
 kind: spike
-status: blocked
+status: planned
 session_role: implementation
 internal_validation: not-required
 depends_on:
@@ -52,12 +52,12 @@ human_decision: pending
 
 ## Acceptance criteria
 
-- [ ] upstream 공식 install/build 명령 확인
-- [ ] clean install 결과 기록
+- [x] upstream 공식 install/build 명령 확인
+- [x] clean install 결과 기록
 - [ ] typecheck 또는 동등 검사 결과 기록
 - [ ] Desktop packaging 제외 build asset 결과 기록
-- [ ] 제품 코드 변경 없음
-- [ ] 실패 시 원인과 다음 Recommendation 기록
+- [x] 제품 코드 변경 없음
+- [x] 실패 시 원인과 다음 Recommendation 기록
 
 ## Initial command candidates
 
@@ -90,7 +90,7 @@ npm run build:assets
 
 | Attempt | Session role | Commit | External | Internal | Recommendation |
 |---:|---|---|---|---|---|
-| 1 | implementation | `5fc304ad20b7eba2d6649faa2a6377f783a5e4c8` baseline | `BLOCKED` — `npm ci` failed on Android/arm64 native dependency install | `NOT_REQUIRED` | `RETRY` — use a supported host with Node 22+; do not patch CCR source or dependencies |
+| 1 | implementation | `5fc304ad20b7eba2d6649faa2a6377f783a5e4c8` baseline | `BLOCKED_ENVIRONMENT` — unsupported Android/arm64 Termux native dependency environment | `NOT_REQUIRED` | `RETRY` — run unchanged on a supported Node 22+ Linux/macOS/Windows host |
 
 ## Evidence / limitations
 
@@ -101,9 +101,9 @@ npm run build:assets
 - Pinned source verification: `PASS` — `v3.0.22^{commit}` is `829298cf8bdcc6ddb9120a5a7c790c30227a1937`, the pin is an ancestor of the tested baseline, root package version is `3.0.22`, and no upstream-controlled product path differs from the pin.
 - Upstream requirements: root `package.json` requires Node `>=22`; pinned README and install documentation use npm and prescribe `npm ci` for a source checkout. No exact npm version is pinned.
 - Attempt 1 environment: Node `v26.4.0`, npm `11.19.0`, `android`/`arm64`, Linux kernel `6.6.102-android15` under Termux.
-- Clean install: `BLOCKED` — `npm ci` exited `1`. `better-sqlite3@12.11.1` had no prebuilt binary for Node `26.4.0` on `android`/`arm64`; its fallback `node-gyp` configure failed because `android_ndk_path` was undefined.
+- Clean install: `BLOCKED_ENVIRONMENT` — `npm ci` exited `1`. `better-sqlite3@12.11.1` had no prebuilt binary for Node `26.4.0` on `android`/`arm64`; its fallback `node-gyp` configure failed because `android_ndk_path` was undefined.
 - Classification: environment/native dependency compatibility. The failure does not establish a pinned source or lockfile defect.
-- Stop condition handling: Android/Termux is not an upstream-documented supported source-build host, and native dependency resolution failed in the available environment. This attempt stopped without a source workaround; whether the native dependency resolves on a supported host remains untested. `npm run typecheck` and `npm run build:assets` were not run because the install was incomplete; running them would not be valid evidence.
+- Stop condition evaluation: `NOT_MET` — Android/Termux is not an upstream-documented supported source-build host, so this result does not satisfy the supported-environment native dependency stop condition. Whether the native dependency resolves on a supported host remains untested. `npm run typecheck` and `npm run build:assets` were not run because the install was incomplete; running them would not be valid evidence.
 - Product code diff after the failed install: `PASS` — `packages/**`, `package.json`, and `package-lock.json` remained unchanged.
 - Limitation: the Validation question remains unanswered until the same stock commands pass on a supported Node 22+ host environment.
 
