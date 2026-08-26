@@ -8,12 +8,11 @@ Company Wrapper를 작은 증거 단위로 개발한다.
 ## 증명해야 할 것
 
 - CCR upstream history를 보존한 하나의 repository 구성
-- 검증 가능한 외부 build runner에서 pinned Stock CCR 설치·빌드
-- 사내 Windows에서 pinned Stock CCR 설치·실행
+- 사내 Windows에서 pinned Stock CCR 설치·빌드·실행
 - 사내 OpenAI-compatible API의 completion/streaming/tool contract 호환
 - GLM·Gemma의 Claude Code Agent loop 수행 범위
 - 다른 사용자가 재현 가능한 setup/doctor
-- 외부 에이전트 개발과 사내 Windows 테스트 사이의 안전한 증거 전달
+- Android/Termux의 외부 에이전트 개발과 사내 Windows 테스트 사이의 안전한 증거 전달
 
 ## 책임 경계
 
@@ -52,26 +51,27 @@ CCR configuration
 
 ```text
 Native Termux
-→ 기본 개발 제어, Git, 문서, Task, 리뷰
-
-Termux + PRoot Linux
-→ 외부 install/typecheck/build와 비-GUI 검증의 우선 runner
+→ 기본 개발 제어, Git, 문서, Task, PR, 리뷰
 
 사내 Windows
-→ 실제 대상 환경의 test-only 검증
+→ install, typecheck, build, 실행, 사내 연동, Claude Code E2E
+
+별도 PC / CI / PRoot Linux
+→ 두 기본 환경만으로 결론을 낼 수 없을 때만 선택
 ```
 
 개인 Windows/Linux PC, Codex Cloud, GitHub Actions는 초기 필수가 아니다.
-PRoot로 증명할 수 없는 native/OS 항목이 생길 때만 별도 runner를 추가한다.
-최종 대상이 Windows이므로 Windows-specific 증거는 사내 환경에서 반드시 확보한다.
+사내 Windows에서 exact commit을 build하고 실행하는 것은 개발이 아니라 test-only 검증이다.
+최종 target이 Windows이므로 Windows-specific 증거는 사내 환경에서 확보한다.
 자세한 기준은 `company/docs/ENVIRONMENTS.md`를 따른다.
 
 ## 제품 버전
 
 ### Wrapper V1 — Internal Adoption Foundation
 
-검증 가능한 외부 build runner에서 Stock CCR와 Wrapper를 만들고,
-사내 Windows에서 반복 가능하고 안전하게 설치하여 사내 모델을 Claude Code Agent 모델로 검증·사용한다.
+Android/Termux에서 Company layer를 개발·관리하고,
+사내 Windows에서 반복 가능하고 안전하게 설치·검증하여
+사내 모델을 Claude Code Agent 모델로 사용한다.
 
 `static-economy`는 V1의 정의가 아니라 Native와 비교하는 선택 실험이다.
 
@@ -118,10 +118,10 @@ Availability 오류와 품질 실패를 혼합하지 않는다.
 ## 개발/검증 루프
 
 ```text
-Termux-first external agent development
-→ 필요 시 PRoot Linux build evidence
+Termux external agent development
 → exact candidate commit
 → internal Windows pull and test only
 → sanitized result
+→ external repair session if needed
 → human Gate/next Task decision
 ```
