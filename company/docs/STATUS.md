@@ -18,10 +18,10 @@
 ## Current
 
 - Stage: `V1-S0`
-- Active Task: `V1-S0-T01`
-- Status: `READY_FOR_INTERNAL_VALIDATION`
-- Goal: Company 변경 없이 Stock CCR `v3.0.22`가 사내 Windows에서 install/typecheck/build되는지 검증
-- Node policy: upstream `>=22`를 만족하는 LTS major 사용; 현재 Node 22 또는 Node 24 허용
+- Active Task: `V1-S0-T02`
+- Status: `PLANNED`
+- Goal: build가 검증된 Stock CCR CLI를 사내 Windows에서 source checkout 그대로 start/stop하고 runtime/config 경로를 확인
+- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 
 ## Confirmed facts
 
@@ -34,33 +34,32 @@
 | Integration merge ancestry | PASS | merge base with final main is `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` |
 | CCR repository structure | PASS | `package.json`, `packages/`, `build/`, `docs/`, `LICENSE`, `company/` present |
 | Native Termux build attempt | BLOCKED_ENVIRONMENT | Attempt 1 failed at Android/arm64 native dependency install; PR #8 preserved the evidence |
-| Stock CCR internal Windows build | READY_FOR_INTERNAL_VALIDATION | Active Task `V1-S0-T01`; supported Node LTS `>=22` + clean `npm ci` + typecheck + build:assets pending |
-| Stock CCR Windows execution | UNVERIFIED | follow-up V1-S0 validation after build |
+| Stock CCR internal Windows build | PASS | `V1-S0-T01` Attempt 2 on commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966`; npm ci, typecheck, build:assets, product diff all exit `0` |
+| Windows install-integrity anomaly | RECHECK | first `npm ci` returned `0` but `.bin` was absent; clean rerun restored integrity; observed once, root cause unconfirmed |
+| Stock CCR Windows runtime smoke | PLANNED | active Task `V1-S0-T02` |
 | Internal provider contract | UNVERIFIED | pending V1-S1 on internal Windows |
 | Claude Code E2E | UNVERIFIED | pending V1-S2 on internal Windows |
 
-## BOOT final evidence
+## V1-S0-T01 final evidence
 
 | Item | Result |
 |---|---|
-| Official upstream | `https://github.com/musistudio/claude-code-router.git` |
-| Tag/PIN equality | `PASS` — `v3.0.22^{commit}` = PIN |
-| Foundation | `9c117d73aa9732e599e5a2b685090aeb4e706566` |
-| Integration merge | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` |
-| Candidate branch HEAD | `43e087e17956fc74a06456d124dddb56268bedc0` |
-| Final integration main | `b05567891e15a157d8e54fac627618f8214128a7` |
-| Merge method | `Create a merge commit` |
-| Final main ancestry | PIN `PASS`; foundation `PASS`; integration merge `PASS` |
-| Upstream-controlled tree | `PASS` — candidate verification found no diff |
-| Origin tag | `PASS` — `refs/tags/v3.0.22` absent after branch-only push |
-| Actions during merge | `DISABLED` — user-confirmed before merge; remains disabled |
+| Tested commit | `97b73a9f4e1fb23d406bb987d0785cefa1f99966` |
+| Environment | Microsoft Windows 11 Enterprise `10.0.2231`, Node `v24.15.0`, npm `11.12.1`, `win32`, `x64` |
+| Working tree before test | `CLEAN` |
+| Final clean npm install | `PASS`, exit `0` |
+| Typecheck | `PASS`, exit `0` |
+| Build assets | `PASS`, exit `0` |
+| Product diff | `PASS`, exit `0` |
+| Final Git status | `CLEAN` — no output |
+| Reproducibility | `1/1` |
+| Human decision | `ACCEPTED` |
 
 ## Open risks
 
 - Imported upstream workflows are not yet approved for this repository. Keep GitHub Actions disabled.
-- 사내 Windows에서 dependency 설치가 네트워크/registry 정책으로 차단될 수 있다. 이 경우 제품 결함과 분리해 기록한다.
-- Node 24에서만 native dependency 또는 build failure가 발생하면 Node major compatibility 가능성을 분리해 기록하고, 필요한 경우에만 Node 22 비교 검증을 수행한다.
-- Stock CCR build와 runtime은 아직 사내 Windows에서 검증되지 않았다.
+- 첫 `npm ci`가 exit `0`이었지만 실제 설치가 불완전했던 단일 사례의 원인은 확인되지 않았다. 후속 검증자는 install exit code만 보지 말고 실제 typecheck/build 또는 필요한 실행 파일 존재까지 확인한다.
+- Stock CCR runtime start/stop, 설정 위치, 기본 로그 위치는 아직 사내 Windows에서 검증되지 않았다.
 
 ## Last passed gate
 
@@ -69,11 +68,14 @@
 - Baseline commit: `b05567891e15a157d8e54fac627618f8214128a7`
 - Date: `2026-08-26`
 
+## Last completed Task
+
+- Task: `V1-S0-T01`
+- Decision: `ACCEPTED`
+- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Date: `2026-08-26`
+
 ## Next action
 
-1. 사내 Windows working tree가 clean이고 `process.platform=win32`, `process.arch=x64`인지 확인한다.
-2. 설치된 Node가 upstream `>=22`를 만족하는 LTS major인지 확인한다. Node 24 LTS는 허용한다.
-3. 현재 설치된 지원 LTS 환경에서 `npm ci`, `npm run typecheck`, `npm run build:assets`를 변경 없이 실행한다.
-4. 사내에서는 수정하지 않고 command/exit code/분류/sanitized observation만 외부에 반환한다.
-5. Node-major-specific failure 증거가 있을 때만 Node 22 비교 재검증을 고려한다.
-6. 결과를 같은 `V1-S0-T01`의 Attempt 2로 기록한다.
+Run only `company/tasks/v1-s0/V1-S0-T02-STOCK-RUNTIME-SMOKE.md` on internal Windows.
+Do not configure internal providers or start V1-S1 until the V1-S0 runtime smoke and Gate decision are complete.

@@ -96,6 +96,34 @@ working tree = clean
 정확한 candidate commit = 기록됨
 ```
 
+### Install integrity verification
+
+`npm ci`의 exit code `0`만으로 설치 성공을 확정하지 않는다.
+`V1-S0-T01`에서 첫 `npm ci`가 `0`을 반환했지만 `node_modules/.bin`이 없고 `tsc`를 실행할 수 없었던 단일 사례가 있었다.
+`node_modules` 삭제 후 clean rerun에서는 정상 설치되었고 모든 검사가 통과했다.
+
+따라서 검증자는 반드시 다음을 함께 확인한다.
+
+```text
+npm ci exit code
++ 실제 후속 typecheck
++ 실제 build 또는 runtime command
+```
+
+필요할 때는 아래처럼 설치 도구 존재를 보조 확인할 수 있다.
+
+```powershell
+Test-Path node_modules\.bin\tsc.cmd
+```
+
+exit `0`인데 후속 도구가 없으면:
+
+1. 제품 코드나 dependency를 수정하지 않는다.
+2. `INSTALL_INTEGRITY_ANOMALY`로 기록한다.
+3. `node_modules`만 삭제하고 clean `npm ci`를 한 번 재시도한다.
+4. 최초 현상과 재시도 결과를 모두 Evidence에 남긴다.
+5. 반복 재현되기 전에는 CCR 또는 npm의 확정 결함으로 단정하지 않는다.
+
 ### Test-only 원칙
 
 - 사내에서 source, dependency, script를 수정하지 않는다.
