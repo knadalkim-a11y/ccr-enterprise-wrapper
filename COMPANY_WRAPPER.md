@@ -23,17 +23,17 @@ Wrapper V2
 
 ```text
 Native Termux
-→ 기본 개발 제어, Git, 문서, Task, 리뷰
-
-Termux + PRoot Linux
-→ 외부 install/typecheck/build 우선 runner
+→ 기본 개발 제어, Git, 문서, Task, PR, 리뷰
 
 사내 Windows
-→ 실제 대상 환경의 test-only 검증
+→ install, typecheck, build, 실행, 사내 연동, Claude Code E2E
+
+별도 PC / CI / PRoot Linux
+→ 두 기본 환경만으로 결론을 낼 수 없을 때만 선택
 ```
 
 개인 Windows/Linux PC와 cloud runner는 초기 필수가 아니다.
-다만 Windows-specific 증거는 V1 완료 전에 사내 Windows에서 반드시 확보한다.
+사내 Windows에서 exact candidate를 build하고 실행하는 것은 개발이 아니라 test-only 검증이다.
 자세한 기준은 `company/docs/ENVIRONMENTS.md`를 따른다.
 
 ## 새 세션 진입점
