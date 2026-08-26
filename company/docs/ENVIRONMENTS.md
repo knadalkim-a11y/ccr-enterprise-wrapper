@@ -75,6 +75,8 @@ package.json / package-lock.json = pinned source와 일치
 - Electron GUI, system tray, installer, Windows 동작을 증명하지 않는다.
 - PRoot에서만 발생하는 실패를 곧바로 CCR source defect로 분류하지 않는다.
 - 오류를 통과시키기 위한 dependency/source patch를 하지 않는다.
+- `/sdcard` 또는 Android shared storage에서 `npm ci`를 실행하지 않는다. symlink, execute bit, filesystem semantics가 build를 왜곡할 수 있다.
+- native Termux와 PRoot 사이에서 `node_modules`를 공유하거나 복사하지 않는다.
 
 ### 권장 초기 구성
 
@@ -105,6 +107,19 @@ npm --version
 node -p "process.platform"
 node -p "process.arch"
 ```
+
+검증용 repository는 PRoot 내부 filesystem에 별도로 clone한다.
+
+```bash
+cd ~
+git clone https://github.com/knadalkim-a11y/ccr-enterprise-wrapper.git
+cd ccr-enterprise-wrapper
+git switch main
+git pull --ff-only origin main
+```
+
+build 결과는 Task Evidence로 요약하고, 공식 문서 갱신과 push는 native Termux의 Codex 세션에서 수행해도 된다.
+PRoot clone에 credential을 추가할 필요는 없다.
 
 Node/nvm 버전은 Task 시작 시 다시 확인한다. 이 명령은 개발 편의를 위한 예시이며
 Company product installer나 사내 배포 방식이 아니다.
