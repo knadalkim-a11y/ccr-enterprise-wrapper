@@ -19,7 +19,7 @@
 
 - Stage: `V1-S0`
 - Active Task: `V1-S0-T01`
-- Status: `PLANNED`
+- Status: `READY_FOR_INTERNAL_VALIDATION`
 - Goal: Company 변경 없이 Stock CCR `v3.0.22`가 사내 Windows에서 install/typecheck/build되는지 검증
 
 ## Confirmed facts
