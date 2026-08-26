@@ -10,9 +10,9 @@
 - Upstream history integrated: `YES`
 - Integration main commit: `b05567891e15a157d8e54fac627618f8214128a7`
 - Wrapper version: `pre-v1`
-- Development control: Android/Termux-first
-- External build preference: Termux + PRoot Linux
-- Internal target environment: Windows, test only
+- Development control: Android/Termux
+- Primary validation environment: Internal Windows, test only
+- Optional runner: separate PC/CI/PRoot only when internal Windows cannot provide conclusive evidence
 - GitHub Actions: `DISABLED` — upstream workflows 검토 전까지 유지
 
 ## Current
@@ -20,7 +20,7 @@
 - Stage: `V1-S0`
 - Active Task: `V1-S0-T01`
 - Status: `PLANNED`
-- Goal: Company 변경 없이 Stock CCR `v3.0.22`의 외부 install/typecheck/build 가능 여부 검증
+- Goal: Company 변경 없이 Stock CCR `v3.0.22`가 사내 Windows에서 install/typecheck/build되는지 검증
 
 ## Confirmed facts
 
@@ -32,9 +32,9 @@
 | Foundation ancestry | PASS | merge base with final main is foundation SHA |
 | Integration merge ancestry | PASS | merge base with final main is `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` |
 | CCR repository structure | PASS | `package.json`, `packages/`, `build/`, `docs/`, `LICENSE`, `company/` present |
-| Stock CCR external build | RETRY_REQUIRED | Attempt 1 was `BLOCKED_ENVIRONMENT` on native Android/arm64 Termux; PR #8 recorded the evidence without closing the Task |
-| PRoot Linux retry | PLANNED | preferred Attempt 2: Ubuntu userland + Node 22 on the same Android device |
-| Stock CCR Windows execution | UNVERIFIED | later V1-S0 target validation on internal Windows |
+| Native Termux build attempt | BLOCKED_ENVIRONMENT | Attempt 1 failed at Android/arm64 native dependency install; PR #8 preserved the evidence |
+| Stock CCR internal Windows build | READY_FOR_INTERNAL_VALIDATION | Active Task `V1-S0-T01`; Node 22 + clean `npm ci` + typecheck + build:assets pending |
+| Stock CCR Windows execution | UNVERIFIED | follow-up V1-S0 validation after build |
 | Internal provider contract | UNVERIFIED | pending V1-S1 on internal Windows |
 | Claude Code E2E | UNVERIFIED | pending V1-S2 on internal Windows |
 
@@ -57,9 +57,8 @@
 ## Open risks
 
 - Imported upstream workflows are not yet approved for this repository. Keep GitHub Actions disabled.
-- PRoot Linux is not a Windows runtime and cannot validate Desktop/installer/Windows path behavior.
-- Stock CCR external build remains unanswered until `npm ci`, `typecheck`, and `build:assets` pass in the PRoot Linux retry or another approved runner.
-- Final product feasibility still depends on internal Windows validation.
+- 사내 Windows에서 dependency 설치가 네트워크/registry 정책으로 차단될 수 있다. 이 경우 제품 결함과 분리해 기록한다.
+- Stock CCR build와 runtime은 아직 사내 Windows에서 검증되지 않았다.
 
 ## Last passed gate
 
@@ -70,7 +69,8 @@
 
 ## Next action
 
-1. Native Termux의 임시 `AI_WORK_REPORT.md`를 repository 밖으로 이동하거나 삭제한다.
-2. `company/docs/ENVIRONMENTS.md`에 따라 Ubuntu PRoot + Node 22를 준비한다.
-3. 같은 `V1-S0-T01`의 Attempt 2로 `npm ci`, `npm run typecheck`, `npm run build:assets`를 변경 없이 실행한다.
-4. PRoot 제약으로 실패 원인을 구분할 수 없을 때만 별도 Windows/Linux PC 또는 CI를 고려한다.
+1. Native Termux에서 repository를 최신 `main`으로 동기화하고 임시 `AI_WORK_REPORT.md`를 정리한다.
+2. 사내 Windows에서 최신 승인 `main`의 exact commit을 pull한다.
+3. Node 22로 `npm ci`, `npm run typecheck`, `npm run build:assets`를 변경 없이 실행한다.
+4. 사내에서는 수정하지 않고 command/exit code/분류/sanitized observation만 외부에 반환한다.
+5. 결과를 같은 `V1-S0-T01`의 Attempt 2로 기록한다.
