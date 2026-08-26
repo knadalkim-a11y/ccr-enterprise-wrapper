@@ -3,7 +3,7 @@ id: V1-S0-T01
 stage: V1-S0
 title: Stock CCR internal Windows build
 kind: spike
-status: ready_internal
+status: done
 session_role: validation
 internal_validation: required
 depends_on:
@@ -15,7 +15,7 @@ forbidden_paths:
   - packages/**
   - package.json
   - package-lock.json
-human_decision: pending
+human_decision: accepted
 ---
 
 # Stock CCR Internal Windows Build
@@ -58,12 +58,12 @@ Android/Termux는 개발 제어환경으로 유지하고, native addon과 Window
 
 - [x] upstream 공식 install/build 명령 확인
 - [x] native Termux Attempt 1 결과 기록
-- [ ] 사내 Windows에서 clean `npm ci` 결과 기록
-- [ ] 사내 Windows에서 `npm run typecheck` 결과 기록
-- [ ] 사내 Windows에서 Desktop packaging 제외 `npm run build:assets` 결과 기록
+- [x] 사내 Windows에서 clean `npm ci` 결과 기록
+- [x] 사내 Windows에서 `npm run typecheck` 결과 기록
+- [x] 사내 Windows에서 Desktop packaging 제외 `npm run build:assets` 결과 기록
 - [x] Attempt 1 이후 제품 코드 변경 없음
 - [x] Attempt 1 실패 원인과 다음 Recommendation 기록
-- [ ] Windows 검증 후 제품 코드와 lockfile 무변경 확인
+- [x] Windows 검증 후 제품 코드와 lockfile 무변경 확인
 
 ## Windows preflight and commands
 
@@ -118,8 +118,8 @@ git diff --exit-code -- packages package.json package-lock.json
 git status --short
 ```
 
-명령별 exit code, 실행환경, 핵심 결과만 기록한다.
-사내 주소, 인증정보, 실제 모델명, raw log는 외부 repository에 기록하지 않는다.
+`npm ci`의 exit code만으로 설치 무결성을 확정하지 않는다.
+반드시 후속 `npm run typecheck`와 `npm run build:assets`까지 실행해 실제 도구와 산출물 사용 가능성을 확인한다.
 
 ## Internal validation contract
 
@@ -138,6 +138,7 @@ git status --short
 - `BUILD`
 - `WINDOWS_ENVIRONMENT`
 - `NODE_MAJOR_COMPATIBILITY`
+- `INSTALL_INTEGRITY_ANOMALY`
 - `UNKNOWN`
 
 ## Stop conditions
@@ -157,26 +158,40 @@ git status --short
 | Attempt | Session role | Commit | External | Internal | Recommendation |
 |---:|---|---|---|---|---|
 | 1 | implementation | `5fc304ad20b7eba2d6649faa2a6377f783a5e4c8` baseline | `BLOCKED_ENVIRONMENT` — native Android/arm64 Termux native dependency environment | `NOT_REQUIRED` | `RETRY` — validate unchanged on internal Windows with a supported Node LTS major >= 22 |
+| 2 | validation | `97b73a9f4e1fb23d406bb987d0785cefa1f99966` | `NOT_REQUIRED` | `PASS` — Windows install, typecheck, build assets, product diff all passed | `GO` — proceed to Stock CCR Windows runtime smoke |
+
+## Attempt 2 evidence
+
+- Task: `V1-S0-T01`
+- Tested commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Environment: reported as Microsoft Windows 11 Enterprise `10.0.2231`, Node `v24.15.0`, npm `11.12.1`, `win32`, `x64`
+- Working tree before test: `CLEAN`
+- Final successful `npm ci`: `PASS`, exit `0`
+- `npm run typecheck`: `PASS`, exit `0`
+- `npm run build:assets`: `PASS`, exit `0`
+- Product diff: `PASS`, exit `0`
+- Final Git status: `CLEAN` — no output
+- Failure classification: `N/A` — final validation sequence passed
+- Reproducibility: `1/1`
+- Sanitized observation: the first `npm ci` returned exit `0`, but `node_modules/.bin` was absent and the first typecheck reported that `tsc` was not recognized. After deleting `node_modules` and rerunning `npm ci`, installation integrity was restored and all required checks passed.
+- Interpretation: this single observation is not evidence of a CCR source defect or a confirmed intermittent npm defect. Preserve it as an install-integrity recheck condition; future validators must run typecheck/build rather than trusting the `npm ci` exit code alone.
 
 ## Evidence / limitations
 
 - Baseline CCR commit: `829298cf8bdcc6ddb9120a5a7c790c30227a1937`
 - Repository baseline after BOOT: `b05567891e15a157d8e54fac627618f8214128a7`
 - Attempt 1 evidence merged in PR #8 on `2026-08-26`.
-- GitHub Actions remain disabled while upstream workflows are unreviewed; this Task uses local Windows commands only.
+- GitHub Actions remain disabled while upstream workflows are unreviewed; this Task used local Windows commands only.
 - Pinned source verification: `PASS` — `v3.0.22^{commit}` is the pinned commit, the pin is an ancestor of the tested baseline, root package version is `3.0.22`, and no upstream-controlled product path differs from the pin.
 - Upstream requirements: root `package.json` requires Node `>=22`; source checkout uses npm and `npm ci`; exact npm version is not pinned.
-- Validation policy: use an installed Node LTS major that satisfies `>=22`; Node 22 and Node 24 are accepted at the current validation date. Record the exact Node/npm versions used.
-- Attempt 1 environment: Node `v26.4.0`, npm `11.19.0`, `android`/`arm64`, native Termux.
-- Attempt 1 clean install: `BLOCKED_ENVIRONMENT` — `better-sqlite3` had no Android/arm64 prebuilt binary and native fallback required Android-specific build configuration.
 - Attempt 1 stop condition evaluation: `NOT_MET` — native Termux is not the target Windows validation environment.
-- Attempt 1 product code diff: `PASS` — `packages/**`, `package.json`, and `package-lock.json` remained unchanged.
-- Limitation: the Validation question remains unanswered until the same stock commands run on internal Windows.
+- Attempt 2 answers the validation question with `PASS` for the tested Windows environment and exact commit.
+- Remaining V1-S0 work: Stock CCR CLI/runtime start-stop smoke and runtime/config path evidence.
 
 ## Codex recommendation
 
-`READY_FOR_INTERNAL_VALIDATION` — pull the current approved `main` commit on internal Windows, use an installed supported Node LTS major `>=22`, and run the documented commands unchanged. Do not modify CCR source, dependencies, or scripts in the internal environment.
+`GO` — accept the Windows build validation and proceed to `V1-S0-T02` Stock CCR internal Windows runtime smoke. Keep the one-time install-integrity anomaly as a recheck note, not as a product failure.
 
 ## Human decision
 
-`PENDING`
+`ACCEPTED` — `V1-S0-T01` Windows build validation passed on `2026-08-26`.
