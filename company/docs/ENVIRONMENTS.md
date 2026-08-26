@@ -47,13 +47,19 @@ Native Termux
 
 ### V1-S0에서 검증할 항목
 
-- Node 22 사용 여부
+- Node `>=22`이며 LTS release line인지
+- 실제 사용한 Node/npm 버전 기록
 - clean `npm ci`
 - `npm run typecheck`
 - `npm run build:assets`
 - 제품 코드와 lockfile 무변경
 - Stock CCR CLI/Desktop 시작·종료
 - 실제 설정 위치와 기본 로그 위치
+
+CCR root `package.json`은 Node `>=22`를 요구한다.
+검증 환경은 이 조건을 만족하는 LTS major를 사용하며, 현재 검증 시점에는 Node 22와 Node 24를 허용한다.
+사내에 이미 설치된 지원 LTS 버전이 있으면 그대로 먼저 검증하고, 실제 compatibility 실패 증거 없이 특정 major로 강제 교체하지 않는다.
+exact npm version은 upstream에서 pin하지 않으므로 Node 배포에 포함된 npm 버전을 기록해 사용한다.
 
 ### 이후 Windows에서 검증할 항목
 
@@ -73,13 +79,19 @@ node --version
 npm --version
 node -p "process.platform"
 node -p "process.arch"
+
+$NodeMajor = [int](node -p "process.versions.node.split('.')[0]")
+if ($NodeMajor -lt 22) {
+  throw "Node.js 22 or newer is required. Found major version $NodeMajor."
+}
 ```
 
 진행 조건:
 
 ```text
 process.platform = win32
-Node major = 22
+Node major >= 22
+Node release line = LTS
 working tree = clean
 정확한 candidate commit = 기록됨
 ```
@@ -90,6 +102,7 @@ working tree = clean
 - 실패하면 정확한 commit SHA와 민감정보를 제거한 관찰만 외부 repair session으로 반환한다.
 - 사내 주소, 모델명, 인증정보, raw log는 외부 repository에 기록하지 않는다.
 - `npm ci`가 사내망 정책으로 실패하면 제품 결함으로 단정하지 않고 `NETWORK_OR_REGISTRY`로 분류한다.
+- Node 24에서 native dependency나 build가 실패하면 즉시 source를 수정하지 않고 `NODE_MAJOR_COMPATIBILITY` 가능성을 분리해 기록한다. 필요할 때만 Node 22 재검증을 비교 증거로 사용한다.
 
 공식 Windows release 실행은 Stock runtime feasibility를 빠르게 확인하는 보조 방법이다.
 Company code를 배포하기 전에는 source checkout의 build 검증도 별도로 필요하다.
