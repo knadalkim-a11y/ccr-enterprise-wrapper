@@ -26,13 +26,13 @@
 
 ## Environment suitability
 
-- Native Termux를 기본 제어환경으로 사용하되, 환경이 Task의 증거 조건을 만족하는지 명령 실행 전에 확인한다.
-- `process.platform=android`인 native Termux 결과를 일반 Linux/Windows native dependency 증거로 간주하지 않는다.
-- 외부 install/typecheck/build는 우선 Termux의 PRoot Linux + Node 22에서 시도할 수 있다.
-- PRoot 결과는 Electron GUI, installer 또는 Windows 동작의 증거가 아니다.
-- 최종 대상이 사내 Windows이므로 Windows-specific 항목은 사내 test-only 절차에서 반드시 검증한다.
+- Native Termux는 기본 개발 제어환경이다.
+- `process.platform=android`인 native Termux 결과를 Windows/native-addon 증거로 간주하지 않는다.
+- Stock install/typecheck/build와 Windows-specific 실행 증거는 기본적으로 사내 Windows의 test-only 절차에서 수집한다.
+- 별도 PC, CI, PRoot Linux는 사내 Windows만으로 결과를 구분할 수 없을 때만 Task가 명시적으로 허용한다.
 - 환경 조건이 맞지 않으면 이미 알려진 실패 명령을 반복하지 말고 preflight 결과만 보고한다.
 - 환경 문제를 통과시키기 위한 source/dependency patch를 하지 않는다.
+- 사내 Windows에서는 코드를 수정하지 않고 exact candidate commit만 검증한다.
 
 ## Architecture boundary
 
