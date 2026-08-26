@@ -82,16 +82,26 @@ node --version
 npm --version
 node -p "process.platform"
 node -p "process.arch"
+
+$NodeMajor = [int](node -p "process.versions.node.split('.')[0]")
+if ($NodeMajor -lt 22) {
+  throw "Node.js 22 or newer is required. Found major version $NodeMajor."
+}
 ```
 
 진행 조건:
 
 ```text
 process.platform = win32
-Node major = 22
+Node major >= 22
+사용 중인 Node major가 LTS release line임
 working tree = clean
 TestedCommit = 기록됨
 ```
+
+현재 검증 시점에는 Node 22와 Node 24가 LTS release line이며 둘 다 허용한다.
+CCR root `package.json`은 Node `>=22`를 요구하고 exact npm version은 pin하지 않는다.
+사내에 이미 설치된 지원 LTS 버전을 그대로 검증하며, 실제 실패 증거 없이 Node 22로 강제 downgrade하지 않는다.
 
 조건이 맞으면 다음을 변경 없이 실행한다.
 
@@ -127,11 +137,13 @@ git status --short
 - `TYPECHECK`
 - `BUILD`
 - `WINDOWS_ENVIRONMENT`
+- `NODE_MAJOR_COMPATIBILITY`
 - `UNKNOWN`
 
 ## Stop conditions
 
 - pinned source/ref 불일치
+- Node major가 22 미만이거나 LTS가 아닌 Node line만 사용할 수 있음
 - 사내 Windows에서도 제품 코드 수정 없이는 dependency install/build 불가
 - 사내 정책으로 build 검증을 수행할 수 없고 대체 증거 경로도 승인되지 않음
 
@@ -144,7 +156,7 @@ git status --short
 
 | Attempt | Session role | Commit | External | Internal | Recommendation |
 |---:|---|---|---|---|---|
-| 1 | implementation | `5fc304ad20b7eba2d6649faa2a6377f783a5e4c8` baseline | `BLOCKED_ENVIRONMENT` — native Android/arm64 Termux native dependency environment | `NOT_REQUIRED` | `RETRY` — validate unchanged on internal Windows with Node 22 |
+| 1 | implementation | `5fc304ad20b7eba2d6649faa2a6377f783a5e4c8` baseline | `BLOCKED_ENVIRONMENT` — native Android/arm64 Termux native dependency environment | `NOT_REQUIRED` | `RETRY` — validate unchanged on internal Windows with a supported Node LTS major >= 22 |
 
 ## Evidence / limitations
 
@@ -153,7 +165,8 @@ git status --short
 - Attempt 1 evidence merged in PR #8 on `2026-08-26`.
 - GitHub Actions remain disabled while upstream workflows are unreviewed; this Task uses local Windows commands only.
 - Pinned source verification: `PASS` — `v3.0.22^{commit}` is the pinned commit, the pin is an ancestor of the tested baseline, root package version is `3.0.22`, and no upstream-controlled product path differs from the pin.
-- Upstream requirements: root `package.json` requires Node `>=22`; source checkout uses npm and `npm ci`.
+- Upstream requirements: root `package.json` requires Node `>=22`; source checkout uses npm and `npm ci`; exact npm version is not pinned.
+- Validation policy: use an installed Node LTS major that satisfies `>=22`; Node 22 and Node 24 are accepted at the current validation date. Record the exact Node/npm versions used.
 - Attempt 1 environment: Node `v26.4.0`, npm `11.19.0`, `android`/`arm64`, native Termux.
 - Attempt 1 clean install: `BLOCKED_ENVIRONMENT` — `better-sqlite3` had no Android/arm64 prebuilt binary and native fallback required Android-specific build configuration.
 - Attempt 1 stop condition evaluation: `NOT_MET` — native Termux is not the target Windows validation environment.
@@ -162,7 +175,7 @@ git status --short
 
 ## Codex recommendation
 
-`READY_FOR_INTERNAL_VALIDATION` — pull the current approved `main` commit on internal Windows, use Node 22, and run the documented commands unchanged. Do not modify CCR source, dependencies, or scripts in the internal environment.
+`READY_FOR_INTERNAL_VALIDATION` — pull the current approved `main` commit on internal Windows, use an installed supported Node LTS major `>=22`, and run the documented commands unchanged. Do not modify CCR source, dependencies, or scripts in the internal environment.
 
 ## Human decision
 
