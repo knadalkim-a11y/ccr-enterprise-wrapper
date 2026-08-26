@@ -17,11 +17,11 @@
 
 ## Current
 
-- Stage: `V1-S0`
-- Active Task: `V1-S0-T02`
-- Status: `PLANNED`
-- Goal: build가 검증된 Stock CCR CLI를 사내 Windows에서 source checkout 그대로 start/stop하고 runtime/config 경로를 확인
-- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Stage: `V1-S1`
+- Active Task: `V1-S1-T01`
+- Status: `READY_FOR_INTERNAL_VALIDATION`
+- Goal: Stock CCR에서 사내 GLM custom Provider 한 개와 모델 한 개의 basic `Check Connection`을 source 수정 없이 검증
+- V1-S0 validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 
 ## Confirmed facts
 
@@ -30,52 +30,58 @@
 | Company repository foundation | PASS | foundation `9c117d73aa9732e599e5a2b685090aeb4e706566` |
 | CCR upstream history | PASS | PR #5 merged with merge commit; final integration main `b05567891e15a157d8e54fac627618f8214128a7` |
 | Pinned CCR ancestry | PASS | merge base with final main is PIN `829298cf8bdcc6ddb9120a5a7c790c30227a1937` |
-| Foundation ancestry | PASS | merge base with final main is foundation SHA |
-| Integration merge ancestry | PASS | merge base with final main is `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` |
 | CCR repository structure | PASS | `package.json`, `packages/`, `build/`, `docs/`, `LICENSE`, `company/` present |
 | Native Termux build attempt | BLOCKED_ENVIRONMENT | Attempt 1 failed at Android/arm64 native dependency install; PR #8 preserved the evidence |
-| Stock CCR internal Windows build | PASS | `V1-S0-T01` Attempt 2 on commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966`; npm ci, typecheck, build:assets, product diff all exit `0` |
+| Stock CCR internal Windows build | PASS | `V1-S0-T01` on commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966`; npm ci, typecheck, build:assets, product diff exit `0` |
 | Windows install-integrity anomaly | RECHECK | first `npm ci` returned `0` but `.bin` was absent; clean rerun restored integrity; observed once, root cause unconfirmed |
-| Stock CCR Windows runtime smoke | PLANNED | active Task `V1-S0-T02` |
-| Internal provider contract | UNVERIFIED | pending V1-S1 on internal Windows |
+| Stock CCR Windows runtime smoke | PASS | `V1-S0-T02` on the same product commit; CLI help/start/stop and product diff exit `0`; runtime data directory created |
+| V1-S0 Gate | ACCEPTED | internal Windows install/build/start/stop demonstrated without product source changes |
+| GLM Provider connection check | READY_FOR_INTERNAL_VALIDATION | active Task `V1-S1-T01` |
+| Gateway basic completion | UNVERIFIED | pending later V1-S1 Task |
+| Streaming/tool contract | UNVERIFIED | pending later V1-S1 Tasks |
 | Claude Code E2E | UNVERIFIED | pending V1-S2 on internal Windows |
 
-## V1-S0-T01 final evidence
+## V1-S0 final evidence
 
 | Item | Result |
 |---|---|
-| Tested commit | `97b73a9f4e1fb23d406bb987d0785cefa1f99966` |
-| Environment | Microsoft Windows 11 Enterprise `10.0.2231`, Node `v24.15.0`, npm `11.12.1`, `win32`, `x64` |
-| Working tree before test | `CLEAN` |
-| Final clean npm install | `PASS`, exit `0` |
+| Tested product commit | `97b73a9f4e1fb23d406bb987d0785cefa1f99966` |
+| Environment | Microsoft Windows 11 Enterprise reported as `10.0.2231`, Node `v24.15.0`, npm `11.12.1`, `win32`, `x64` |
+| Clean install | `PASS`, final exit `0` |
 | Typecheck | `PASS`, exit `0` |
 | Build assets | `PASS`, exit `0` |
+| CLI entrypoint/help | `PASS`, exit `0` |
+| Management-only start | `PASS`, exit `0` |
+| Runtime data directory | absent before first start; present after start |
+| Stop | `PASS`, exit `0` |
 | Product diff | `PASS`, exit `0` |
 | Final Git status | `CLEAN` — no output |
-| Reproducibility | `1/1` |
-| Human decision | `ACCEPTED` |
+| Runtime smoke reproducibility | `1/1` |
+| V1-S0 Human decision | `ACCEPTED` on `2026-08-27` |
 
 ## Open risks
 
 - Imported upstream workflows are not yet approved for this repository. Keep GitHub Actions disabled.
-- 첫 `npm ci`가 exit `0`이었지만 실제 설치가 불완전했던 단일 사례의 원인은 확인되지 않았다. 후속 검증자는 install exit code만 보지 말고 실제 typecheck/build 또는 필요한 실행 파일 존재까지 확인한다.
-- Stock CCR runtime start/stop, 설정 위치, 기본 로그 위치는 아직 사내 Windows에서 검증되지 않았다.
+- The first-install integrity anomaly remains a one-time `RECHECK`; validators must run real follow-up commands instead of trusting `npm ci` exit code alone.
+- V1-S0 used source-built CLI management-only mode. Desktop installer/package was not tested.
+- Internal Provider protocol, endpoint permission, proxy/TLS, model access, gateway request, streaming, and tools remain unverified.
+- Provider `Check Connection` output may include internal diagnostics; only sanitized categories may be returned externally.
 
 ## Last passed gate
 
-- Gate: `BOOT`
+- Gate: `V1-S0`
 - Decision: `ACCEPTED`
-- Baseline commit: `b05567891e15a157d8e54fac627618f8214128a7`
-- Date: `2026-08-26`
+- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Date: `2026-08-27`
 
 ## Last completed Task
 
-- Task: `V1-S0-T01`
+- Task: `V1-S0-T02`
 - Decision: `ACCEPTED`
-- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
-- Date: `2026-08-26`
+- Tested product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Date: `2026-08-27`
 
 ## Next action
 
-Run only `company/tasks/v1-s0/V1-S0-T02-STOCK-RUNTIME-SMOKE.md` on internal Windows.
-Do not configure internal providers or start V1-S1 until the V1-S0 runtime smoke and Gate decision are complete.
+Run only `company/tasks/v1-s1/V1-S1-T01-GLM-PROVIDER-CHECK.md` on internal Windows.
+Configure one GLM Provider and one model in CCR runtime data, run `Check Connection`, redact all internal values, and do not start gateway-client, streaming, tool, Gemma, or Claude Code tests yet.
