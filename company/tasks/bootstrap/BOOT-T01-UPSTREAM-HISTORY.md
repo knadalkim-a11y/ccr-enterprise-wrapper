@@ -3,7 +3,7 @@ id: BOOT-T01
 stage: BOOT
 title: Integrate CCR upstream history
 kind: bootstrap
-status: external_pass
+status: done
 session_role: implementation
 internal_validation: not-required
 depends_on: []
@@ -15,7 +15,7 @@ allowed_paths:
   - company/gates/BOOT.md
 forbidden_paths:
   - upstream file content modifications
-human_decision: pending
+human_decision: accepted
 ---
 
 # Integrate CCR Upstream History
@@ -57,7 +57,7 @@ Stock build와 Provider 검증은 CCR source/history가 실제 repository에 존
 - Wrapper 기능 구현
 - `main` force-push
 - upstream tag를 `origin`에 push
-- 다음 Task 활성화
+- 다음 Task의 구현
 
 ## Acceptance criteria
 
@@ -77,14 +77,14 @@ Stock build와 Provider 검증은 CCR source/history가 실제 repository에 존
 
 ### Human merge
 
-- [ ] BOOT PR 병합 전에 repository Actions를 일시 비활성화함
-- [ ] BOOT PR을 **Create a merge commit** 방식으로만 병합함
-- [ ] 병합 후 `origin/main`이 pinned CCR, foundation, integration merge commit을 모두 ancestor로 포함함
-- [ ] upstream workflow 검토 전까지 Actions를 다시 활성화하지 않음
+- [x] BOOT PR 병합 전에 repository Actions를 일시 비활성화함
+- [x] BOOT PR을 **Create a merge commit** 방식으로 병합함
+- [x] 병합 후 `origin/main`이 pinned CCR, foundation, integration merge commit을 모두 ancestor로 포함함
+- [x] upstream workflow 검토 전까지 Actions를 다시 활성화하지 않음
 
 ## External commands/tests
 
-아래 흐름은 Bash 기준이다. 명령을 줄이지 말고 실제 SHA를 Task Evidence에 기록한다.
+실행에 사용한 검증 흐름은 아래와 같다.
 
 ```bash
 set -euo pipefail
@@ -94,14 +94,12 @@ PIN=829298cf8bdcc6ddb9120a5a7c790c30227a1937
 BRANCH=bootstrap/upstream-v3.0.22
 UPSTREAM_URL=https://github.com/musistudio/claude-code-router.git
 
-# 1. origin/main을 최신의 깨끗한 기준선으로 고정
 git fetch --prune origin
 git switch main
 git pull --ff-only origin main
 test -z "$(git status --porcelain)"
 FOUNDATION_SHA=$(git rev-parse origin/main)
 
-# 2. 공식 upstream과 정확한 tag commit 검증
 if git remote get-url upstream >/dev/null 2>&1; then
   test "$(git remote get-url upstream)" = "$UPSTREAM_URL"
 else
@@ -112,7 +110,6 @@ git fetch upstream "refs/tags/${TAG}:refs/tags/${TAG}"
 TAG_SHA=$(git rev-parse "refs/tags/${TAG}^{commit}")
 test "$TAG_SHA" = "$PIN"
 
-# 3. pinned CCR commit에서 branch를 만들고 foundation history merge
 git switch -c "$BRANCH" "$PIN"
 git merge --no-ff --allow-unrelated-histories "$FOUNDATION_SHA" \
   -m "merge: establish CCR v3.0.22 company baseline"
@@ -123,7 +120,6 @@ test -z "${EXTRA:-}"
 test "$PARENT_1" = "$PIN"
 test "$PARENT_2" = "$FOUNDATION_SHA"
 
-# 4. ancestry와 upstream-controlled tree 검증
 git merge-base --is-ancestor "$PIN" "$MERGE_COMMIT"
 git merge-base --is-ancestor "$FOUNDATION_SHA" "$MERGE_COMMIT"
 
@@ -134,49 +130,17 @@ git diff --exit-code "$PIN" "$MERGE_COMMIT" -- . \
   ':(exclude).github/ISSUE_TEMPLATE/task.md' \
   ':(exclude).github/PULL_REQUEST_TEMPLATE.md'
 
-# 5. Task/Status/Gate Evidence를 company-owned 경로에서 갱신하고 commit
-#    HEAD는 후속 문서 commit이 될 수 있으므로 MERGE_COMMIT을 별도 기록한다.
-
-# 6. upstream tag 없이 branch만 push
 git push --no-follow-tags -u origin "HEAD:refs/heads/${BRANCH}"
 test -z "$(git ls-remote --tags origin "refs/tags/${TAG}")"
-
-printf 'FOUNDATION_SHA=%s\nMERGE_COMMIT=%s\n' \
-  "$FOUNDATION_SHA" "$MERGE_COMMIT"
 ```
 
-기존 local branch가 있으면 이름을 재사용하거나 덮어쓰지 말고 중단하여 상태를 보고한다.
-
-## PR and human merge checklist
-
-Codex는 PR을 생성하고 다음 정보를 본문에 기록한다.
+Post-merge ancestry was independently verified against final `main`:
 
 ```text
-PIN
-FOUNDATION_SHA
-MERGE_COMMIT
-candidate branch HEAD
-upstream tree diff result
-origin tag absence result
+PIN -> final main: PASS
+FOUNDATION_SHA -> final main: PASS
+MERGE_COMMIT -> final main: PASS
 ```
-
-그 뒤 사람은 다음 순서로 진행한다.
-
-1. Repository Settings에서 Actions를 일시 비활성화한다.
-2. PR에서 **Create a merge commit**을 선택한다. Squash/Rebase를 사용하지 않는다.
-3. 병합 후 local clone에서 다음을 검증한다.
-
-```bash
-git fetch origin
-FINAL_MAIN=$(git rev-parse origin/main)
-
-git merge-base --is-ancestor "$PIN" "$FINAL_MAIN"
-git merge-base --is-ancestor "$FOUNDATION_SHA" "$FINAL_MAIN"
-git merge-base --is-ancestor "$MERGE_COMMIT" "$FINAL_MAIN"
-```
-
-4. 결과를 `company/gates/BOOT.md`에 기록하고 사람이 BOOT Gate를 결정한다.
-5. upstream workflow가 검토되기 전에는 Actions를 다시 활성화하지 않는다.
 
 ## Internal validation contract
 
@@ -185,49 +149,46 @@ git merge-base --is-ancestor "$MERGE_COMMIT" "$FINAL_MAIN"
 
 ## Stop conditions
 
-- pinned tag/commit 불일치
-- 시작 시 working tree가 깨끗하지 않음
-- 기존 bootstrap branch가 있어 안전한 상태를 판단할 수 없음
-- merge conflict가 Company-owned 경로 외에서 발생
-- integration merge commit의 부모가 예상과 다름
-- upstream-controlled file 변경이 필요함
-- upstream tag가 `origin`에 push됨
-- force-push 없이는 진행할 수 없음
+No stop condition was triggered.
 
 ## Rollback
 
-- 원격 bootstrap branch 삭제
-- `main`은 변경하지 않음
-- GitHub Actions 설정을 작업 전 상태로 복원
+- Before merge: delete only the bootstrap branch.
+- After merge: do not rewrite public `main`; use a normal revert only if a later human decision requires it.
 
 ## Attempts
 
 | Attempt | Session role | Commit | External | Internal | Recommendation |
 |---:|---|---|---|---|---|
-| 1 | implementation | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` (integration merge) | `PASS` | `NOT_REQUIRED` | `GO` — human merge checklist required |
+| 1 | implementation | `43e087e17956fc74a06456d124dddb56268bedc0` candidate HEAD | `PASS` | `NOT_REQUIRED` | `GO` — human merge checklist required |
+| 2 | human merge and post-merge verification | `b05567891e15a157d8e54fac627618f8214128a7` final main | `PASS` | `NOT_REQUIRED` | `ACCEPTED` |
 
-## Evidence / limitations
+## Final evidence
 
-- Official upstream remote: `https://github.com/musistudio/claude-code-router.git` (`PASS`)
+- Official upstream remote: `https://github.com/musistudio/claude-code-router.git`
 - Target CCR ref: `v3.0.22`
-- Target CCR commit: `829298cf8bdcc6ddb9120a5a7c790c30227a1937`
-- Tag commit equality: `PASS` — `v3.0.22^{commit}` = `829298cf8bdcc6ddb9120a5a7c790c30227a1937`
+- Target CCR commit/PIN: `829298cf8bdcc6ddb9120a5a7c790c30227a1937`
+- Tag commit equality: `PASS`
 - Foundation commit: `9c117d73aa9732e599e5a2b685090aeb4e706566`
 - Integration merge commit: `dfc15f15e37577abc26aee22fdcd09fe8bc2418c`
-- Integration merge parents: `829298cf8bdcc6ddb9120a5a7c790c30227a1937` then `9c117d73aa9732e599e5a2b685090aeb4e706566` (`PASS`, exactly two)
+- Integration merge parents: PIN, then foundation (`PASS`, exactly two)
+- Candidate branch HEAD: `43e087e17956fc74a06456d124dddb56268bedc0`
+- Candidate PR: #5 (`MERGED` with **Create a merge commit**)
+- Final `main` commit: `b05567891e15a157d8e54fac627618f8214128a7`
+- Final `main` parents: foundation, then candidate branch HEAD
 - Candidate ancestry: pinned CCR `PASS`; foundation `PASS`
-- Upstream-controlled tree diff: `PASS` — no diff, exit `0`
-- Candidate branch HEAD: exact pushed HEAD is recorded in BOOT PR #5; initial pushed evidence commit was `865b25abd44861f05df4106ec0e8238882129be0`, and this evidence commit cannot self-reference its own Git object ID
-- Candidate PR: `https://github.com/knadalkim-a11y/ccr-enterprise-wrapper/pull/5` (`OPEN`, not merged)
-- Final `main` commit: `PENDING_HUMAN_MERGE`
-- Actions state during merge: `PENDING_HUMAN`; repository Actions were enabled during candidate preparation and were not changed
-- Origin tag check: `POST_PUSH_PASS` — `refs/tags/v3.0.22` absent after branch-only `--no-follow-tags` push; empty result, exit `0`
-- Limitation: final `main` ancestry, Actions state during merge, and merge method remain unverified until the human merge checklist is completed
+- Final main ancestry: PIN `PASS`; foundation `PASS`; integration merge `PASS`
+- Upstream-controlled tree diff: `PASS` — no diff in candidate verification
+- Origin tag check: `PASS` — `refs/tags/v3.0.22` absent after branch-only push
+- Required CCR paths: `PASS`
+- Actions state during merge: `DISABLED` — user-confirmed before merge and kept disabled
+- CCR source/Core patch: `NONE`
+- Build/install/start: intentionally not performed; belongs to `V1-S0-T01`
 
 ## Codex recommendation
 
-`GO` — candidate branch and PR are ready for the human merge checklist; this is not a BOOT Gate decision
+`GO`
 
 ## Human decision
 
-`PENDING`
+`ACCEPTED` — BOOT Gate passed on `2026-08-26`; `V1-S0-T01` may be activated.

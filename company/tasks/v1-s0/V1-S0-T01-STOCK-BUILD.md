@@ -3,7 +3,7 @@ id: V1-S0-T01
 stage: V1-S0
 title: Stock CCR external build
 kind: spike
-status: blocked
+status: planned
 session_role: implementation
 internal_validation: not-required
 depends_on:
@@ -27,7 +27,7 @@ human_decision: pending
 ## Why now
 
 사내 Provider, setup, doctor를 만들기 전에 Stock CCR 자체와 개발 도구를 확인한다.
-`BOOT-T01`이 완료되고 사람이 이 Task를 활성화한 뒤에만 시작한다.
+`BOOT-T01`과 BOOT Gate가 완료되어 이 Task가 활성화되었다.
 
 ## Required knowledge
 
@@ -94,6 +94,9 @@ npm run build:assets
 ## Evidence / limitations
 
 - Baseline CCR commit: `829298cf8bdcc6ddb9120a5a7c790c30227a1937`
+- Repository baseline after BOOT: `b05567891e15a157d8e54fac627618f8214128a7`
+- Activated after BOOT Gate `ACCEPTED` on `2026-08-26`.
+- GitHub Actions remain disabled while upstream workflows are unreviewed; this Task uses local commands only.
 
 ## Codex recommendation
 
