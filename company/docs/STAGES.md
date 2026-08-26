@@ -3,8 +3,8 @@
 - Version: 사용자에게 제공되는 큰 제품 능력 (`Wrapper V1`, `Wrapper V2`)
 - Stage: 핵심 불확실성 하나를 제거하는 구간
 - Gate: 다음 투자에 필요한 증거와 사람의 결정
-- Task: 독립적으로 검증 가능한 최소 질문; 여러 Codex 세션을 가질 수 있음
-- Session: 한 Task에 대한 구현·리뷰·수정 시도 하나
+- Task: 독립적으로 검증 가능한 최소 질문; 여러 Codex 세션과 순차 Evidence PR을 가질 수 있음
+- Session: 한 Task에 대한 구현·리뷰·수정·검증 시도 하나
 
 ## Repository Bootstrap
 
@@ -19,16 +19,29 @@ Gate는 두 history의 ancestry, upstream-controlled tree의 무변경, origin/u
 
 ### V1-S0 — Stock CCR Execution
 
-지원 환경 하나에서 pinned Stock CCR을 수정 없이 install/build/start할 수 있는가?
+다음 두 층을 분리해 증명한다.
+
+```text
+External build evidence
+→ 우선 Termux + PRoot Linux에서 pinned Stock CCR install/typecheck/build
+
+Target execution evidence
+→ 사내 Windows에서 exact candidate의 install/start/stop
+```
+
+PRoot Linux에서 build가 통과해도 Windows 동작을 증명한 것은 아니다.
+개인 Windows/Linux PC는 필수가 아니며, PRoot 제약으로 결과를 구분할 수 없을 때만 별도 runner를 고려한다.
 
 ### V1-S1 — Internal Provider Contract
 
-CCR이 사내 OpenAI-compatible API를 안정적인 upstream으로 사용할 수 있는가?
+CCR이 사내 Windows에서 사내 OpenAI-compatible API를 안정적인 upstream으로 사용할 수 있는가?
 
 최소 검증: completion, streaming, tool call/result continuation, 403/429/5xx/timeout 분류.
 GLM 통과 후 Gemma로 확대한다.
 
 ### V1-S2 — Claude Code Vertical Slice
+
+사내 Windows에서 검증한다.
 
 ```text
 GLM: Read → Edit → Test fail → understand → fix → PASS
@@ -45,11 +58,11 @@ Gate는 GLM 최소 loop 증거와 Gemma 권장 범위/제외 사유를 요구한
 
 ### V1-S4 — Repeatable Setup / Doctor
 
-깨끗한 지원 환경에서 setup과 계층별 진단을 재현할 수 있는가?
+깨끗한 사내 Windows 환경에서 setup과 계층별 진단을 재현할 수 있는가?
 
 ### V1-S5 — Safe Pilot
 
-소규모 사용자가 CCR Native를 기본으로 실제 작업에 사용할 수 있는가?
+소규모 사용자가 사내 Windows에서 CCR Native를 기본으로 실제 작업에 사용할 수 있는가?
 
 ### V1-S6 — Static Economy Experiment (Optional)
 
