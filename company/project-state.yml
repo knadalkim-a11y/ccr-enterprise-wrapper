@@ -19,7 +19,7 @@ current:
   stage: BOOT
   task_id: BOOT-T01
   task_path: company/tasks/bootstrap/BOOT-T01-UPSTREAM-HISTORY.md
-  status: planned
+  status: external_pass
 
 next:
   stage: V1-S0

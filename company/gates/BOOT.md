@@ -22,9 +22,9 @@
 
 | Item | Task | Commit | Result |
 |---|---|---|---|
-| History integration candidate | BOOT-T01 | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` | `CANDIDATE_LOCAL_PASS` — both histories are ancestors |
-| Upstream tree unchanged | BOOT-T01 | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` | `CANDIDATE_LOCAL_PASS` — no diff, exit `0` |
-| Origin tag absent | BOOT-T01 | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` | `PRE_PUSH_PASS`; post-push check pending |
+| History integration candidate | BOOT-T01 | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` | `CANDIDATE_PASS` — both histories are ancestors |
+| Upstream tree unchanged | BOOT-T01 | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` | `CANDIDATE_PASS` — no diff, exit `0` |
+| Origin tag absent | BOOT-T01 | `865b25abd44861f05df4106ec0e8238882129be0` | `CANDIDATE_PASS` — absent after branch-only push |
 | Final main ancestry | BOOT-T01 |  | `UNVERIFIED` — human merge required |
 
 ## Candidate details
@@ -34,12 +34,13 @@
 - Foundation: `9c117d73aa9732e599e5a2b685090aeb4e706566`
 - Integration merge: `dfc15f15e37577abc26aee22fdcd09fe8bc2418c`
 - Parents: `829298cf8bdcc6ddb9120a5a7c790c30227a1937` then `9c117d73aa9732e599e5a2b685090aeb4e706566` (`PASS`, exactly two)
-- Candidate branch HEAD: pending evidence commit and push; exact SHA will be recorded in the BOOT PR
+- Candidate branch HEAD: exact current SHA is recorded in PR #5; initial pushed evidence commit was `865b25abd44861f05df4106ec0e8238882129be0`, and this evidence commit cannot self-reference its own object ID
+- Candidate PR: `https://github.com/knadalkim-a11y/ccr-enterprise-wrapper/pull/5` (`OPEN`, not merged)
+- Origin tag: `POST_PUSH_PASS` — `refs/tags/v3.0.22` absent, empty result, exit `0`
 - Human-only evidence: Actions state during merge, merge method, and final `main` ancestry remain pending
 
 ## Remaining risks
 
-- Candidate branch가 아직 push되지 않았고 BOOT PR이 생성되지 않았다.
 - CCR source는 아직 `main`에 반입되지 않았다.
 - Repository Actions는 현재 enabled이며 upstream GitHub workflows는 아직 검토되지 않았다.
 - BOOT PR merge method와 final `main` ancestry는 사람 검증 전까지 미확정이다.

@@ -3,7 +3,7 @@ id: BOOT-T01
 stage: BOOT
 title: Integrate CCR upstream history
 kind: bootstrap
-status: planned
+status: external_pass
 session_role: implementation
 internal_validation: not-required
 depends_on: []
@@ -70,9 +70,9 @@ Stock build와 Provider 검증은 CCR source/history가 실제 repository에 존
 - [x] candidate branch가 pinned upstream commit을 ancestor로 포함함
 - [x] candidate branch가 foundation commit을 ancestor로 포함함
 - [x] Company-owned 경로를 제외한 upstream-controlled tree가 pinned commit과 동일함
-- [ ] `--no-follow-tags`로 branch만 push함
-- [ ] `origin`에 `v3.0.22` tag가 생기지 않음
-- [ ] PR과 재현 가능한 검증 명령이 기록됨
+- [x] `--no-follow-tags`로 branch만 push함
+- [x] `origin`에 `v3.0.22` tag가 생기지 않음
+- [x] PR과 재현 가능한 검증 명령이 기록됨
 - [x] CCR source 변경 없음
 
 ### Human merge
@@ -204,6 +204,7 @@ git merge-base --is-ancestor "$MERGE_COMMIT" "$FINAL_MAIN"
 
 | Attempt | Session role | Commit | External | Internal | Recommendation |
 |---:|---|---|---|---|---|
+| 1 | implementation | `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` (integration merge) | `PASS` | `NOT_REQUIRED` | `GO` — human merge checklist required |
 
 ## Evidence / limitations
 
@@ -216,16 +217,16 @@ git merge-base --is-ancestor "$MERGE_COMMIT" "$FINAL_MAIN"
 - Integration merge parents: `829298cf8bdcc6ddb9120a5a7c790c30227a1937` then `9c117d73aa9732e599e5a2b685090aeb4e706566` (`PASS`, exactly two)
 - Candidate ancestry: pinned CCR `PASS`; foundation `PASS`
 - Upstream-controlled tree diff: `PASS` — no diff, exit `0`
-- Candidate branch HEAD: `PENDING_PUSH` — the exact pushed HEAD will be recorded in the BOOT PR because an evidence commit cannot self-reference its own Git object ID
-- Candidate PR: `PENDING`
+- Candidate branch HEAD: exact pushed HEAD is recorded in BOOT PR #5; initial pushed evidence commit was `865b25abd44861f05df4106ec0e8238882129be0`, and this evidence commit cannot self-reference its own Git object ID
+- Candidate PR: `https://github.com/knadalkim-a11y/ccr-enterprise-wrapper/pull/5` (`OPEN`, not merged)
 - Final `main` commit: `PENDING_HUMAN_MERGE`
 - Actions state during merge: `PENDING_HUMAN`; repository Actions were enabled during candidate preparation and were not changed
-- Origin tag check: `PRE_PUSH_PASS` — `refs/tags/v3.0.22` absent; post-push check pending
+- Origin tag check: `POST_PUSH_PASS` — `refs/tags/v3.0.22` absent after branch-only `--no-follow-tags` push; empty result, exit `0`
 - Limitation: final `main` ancestry, Actions state during merge, and merge method remain unverified until the human merge checklist is completed
 
 ## Codex recommendation
 
-`PENDING`
+`GO` — candidate branch and PR are ready for the human merge checklist; this is not a BOOT Gate decision
 
 ## Human decision
 
