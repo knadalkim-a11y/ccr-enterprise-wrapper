@@ -8,7 +8,8 @@ upstream:
   repository: musistudio/claude-code-router
   ref: v3.0.22
   commit: 829298cf8bdcc6ddb9120a5a7c790c30227a1937
-  integrated: false
+  integrated: true
+  integrated_main_commit: b05567891e15a157d8e54fac627618f8214128a7
 
 workflow:
   external_development: codex
@@ -16,16 +17,14 @@ workflow:
   default_policy: native
 
 current:
-  stage: BOOT
-  task_id: BOOT-T01
-  task_path: company/tasks/bootstrap/BOOT-T01-UPSTREAM-HISTORY.md
-  status: external_pass
-
-next:
   stage: V1-S0
   task_id: V1-S0-T01
   task_path: company/tasks/v1-s0/V1-S0-T01-STOCK-BUILD.md
+  status: planned
+
+next: null
 
 validation:
   last_internal_commit: null
-  last_passed_gate: null
+  last_passed_gate: BOOT
+  last_gate_commit: b05567891e15a157d8e54fac627618f8214128a7
