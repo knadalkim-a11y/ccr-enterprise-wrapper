@@ -17,20 +17,22 @@ Gate는 두 history의 ancestry, upstream-controlled tree의 무변경, origin/u
 
 ## Pre-V1 Feasibility
 
-### V1-S0 — Stock CCR Execution
+### V1-S0 — Stock CCR on Internal Windows
 
-다음 두 층을 분리해 증명한다.
+실제 target인 사내 Windows에서 pinned Stock CCR을 수정 없이 설치·빌드·실행할 수 있는가?
+
+최소 증거:
 
 ```text
-External build evidence
-→ 우선 Termux + PRoot Linux에서 pinned Stock CCR install/typecheck/build
-
-Target execution evidence
-→ 사내 Windows에서 exact candidate의 install/start/stop
+Node 22 preflight
+→ clean npm ci
+→ npm run typecheck
+→ npm run build:assets
+→ CLI/Desktop start/stop smoke
 ```
 
-PRoot Linux에서 build가 통과해도 Windows 동작을 증명한 것은 아니다.
-개인 Windows/Linux PC는 필수가 아니며, PRoot 제약으로 결과를 구분할 수 없을 때만 별도 runner를 고려한다.
+Native Termux는 개발 제어환경이며 Windows/native-addon 증거로 사용하지 않는다.
+별도 PC, CI, PRoot Linux는 사내 Windows만으로 실패 원인을 구분할 수 없을 때만 보조로 사용한다.
 
 ### V1-S1 — Internal Provider Contract
 
