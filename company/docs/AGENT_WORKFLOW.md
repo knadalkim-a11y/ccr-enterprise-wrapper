@@ -29,18 +29,18 @@ Bootstrap처럼 내부 검증이 필요 없는 Task는 `EXTERNAL_PASS → HUMAN_
 
 ```text
 Native Termux
-→ Git, 문서, Task, 리뷰, 에이전트 제어
-
-Termux + PRoot Linux
-→ install, typecheck, build:assets, 비-GUI smoke의 우선 runner
+→ Git, 문서, Task, 리뷰, 에이전트 제어, 외부 구현
 
 사내 Windows
-→ 실제 배포 대상의 test-only 검증
+→ install, typecheck, build, runtime, 사내 연동의 test-only 검증
+
+별도 PC / CI / PRoot Linux
+→ 두 기본 환경만으로 결론을 낼 수 없을 때만 선택
 ```
 
 자세한 기준은 `company/docs/ENVIRONMENTS.md`를 따른다.
-개인 Windows/Linux PC나 Codex Cloud는 초기 필수가 아니다.
-다만 Windows-specific 제품 증거는 최종적으로 사내 Windows에서 확보한다.
+개인 Windows/Linux PC나 cloud runner는 초기 필수가 아니다.
+사내 Windows 검증은 개발이 아니라 exact candidate commit의 target-environment evidence 수집이다.
 
 ## 세션 시작
 
@@ -85,11 +85,21 @@ Termux + PRoot Linux
 
 report 파일은 commit하지 않으며, working tree에 untracked 상태로 남기지 않는다.
 
-## 사내 FAIL 반환
+## 사내 검증 반환
 
-사내에서는 수정하지 않는다. 정확한 candidate commit, 재현률, 일반화된 실패 분류,
-sanitized observation만 동일 Task의 repair session으로 반환한다.
-사내 Windows 검증은 개발이 아니라 target-environment evidence 수집이다.
+사내에서는 수정하지 않는다. 정확한 candidate commit, 명령별 exit code, 재현률,
+일반화된 실패 분류, sanitized observation만 동일 Task의 repair session으로 반환한다.
+
+```text
+PASS
+→ Acceptance Criteria와 Evidence 갱신
+
+FAIL
+→ 외부 repair session으로 반환
+
+BLOCKED
+→ network/registry/권한/정책 등 제품 외 원인 분리
+```
 
 ## 종료
 
