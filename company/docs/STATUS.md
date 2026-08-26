@@ -31,7 +31,7 @@
 | Foundation ancestry | PASS | merge base with final main is foundation SHA |
 | Integration merge ancestry | PASS | merge base with final main is `dfc15f15e37577abc26aee22fdcd09fe8bc2418c` |
 | CCR repository structure | PASS | `package.json`, `packages/`, `build/`, `docs/`, `LICENSE`, `company/` present |
-| Stock CCR external build | UNVERIFIED | active Task `V1-S0-T01` |
+| Stock CCR external build | BLOCKED | `V1-S0-T01` Attempt 1: Android/arm64 `npm ci` native dependency failure; retry unchanged on a supported Node 22+ host |
 | Stock CCR internal execution | UNVERIFIED | pending later Task |
 | Internal provider contract | UNVERIFIED | pending V1-S1 |
 | Claude Code E2E | UNVERIFIED | pending V1-S2 |
