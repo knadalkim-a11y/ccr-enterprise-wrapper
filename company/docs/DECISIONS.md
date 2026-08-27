@@ -1,7 +1,7 @@
 # Decision Log
 
 되돌리기 어렵거나 여러 Task에 영향을 주는 결정만 기록한다.
-상세 구현 선택은 Task Evidence에 남긴다.
+상세 구현 선택과 시도별 결과는 Task Evidence에 남긴다.
 
 ## D-001 — CCR을 공통 Runtime으로 사용
 
@@ -35,7 +35,7 @@
 ## D-006 — 사람 중심 Gate
 
 - Status: ACCEPTED
-- Decision: Codex는 Recommendation과 Evidence를 작성할 수 있지만 Stage 통과와 다음 Task 활성화는 사람이 결정한다.
+- Decision: Agent는 Recommendation과 Evidence를 작성할 수 있지만 Stage 통과와 다음 Task 활성화는 사람이 결정한다.
 
 ## D-007 — 사내 Windows host 권한을 세 capability로 분리
 
@@ -56,12 +56,12 @@
 
 ## D-009 — V1 기본 배포 토폴로지는 Managed Local Fleet
 
-- Status: ACCEPTED
-- Decision: N명의 사용자가 공유하는 M대 승인 Windows PC마다 논리적 Local CCR Runtime 하나를 두는 방식을 V1 기본 토폴로지로 한다.
-- Rationale: Local 장애 격리, host-scoped credential, 현재 CCR Runtime 구조와 가장 잘 맞으며 중앙 Gateway의 SSO/HA/멀티테넌시 범위를 피한다.
+- Status: ACCEPTED_AS_V1_DEFAULT
+- Decision: N명의 사용자가 공유하는 M대 승인 Windows PC마다 논리적 Local CCR Runtime 하나를 두는 방식을 V1 기본 토폴로지로 검증한다.
+- Rationale: Local 장애 격리, host-scoped credential, 현재 CCR Runtime 구조와 잘 맞으며 중앙 Gateway의 SSO/HA/멀티테넌시 범위를 피한다.
 - Consequence: 사용자는 CCR UI, endpoint, protocol, model, upstream key, start/stop을 직접 다루지 않는다.
 - Consequence: Company installer/launcher/doctor가 PC 단위 설치·설정·업데이트·rollback을 담당한다.
-- Validation: `%APPDATA%` 사용자 범위에서 PC당 Runtime 하나를 만드는 구체 방식은 V1-S3에서 검증한다.
+- Validation: `%APPDATA%` 사용자 범위에서 PC당 Runtime 하나를 만드는 구체 방식은 V1-S3에서 검증하며 실패 시 토폴로지를 재검토한다.
 
 ## D-010 — Model data plane과 Fleet analytics plane을 분리
 
@@ -72,20 +72,49 @@
 - Consequence: 초기에는 approved shared path의 daily JSON/CSV batch를 허용하고, 실시간 Collector는 Pilot에서 필요성이 증명될 때만 만든다.
 - Clarification: 중앙 analytics는 중앙 CCR Gateway를 의미하지 않는다.
 
-## D-011 — V1 절감의 1차 KPI는 Successful Sonnet avoidance
+## D-011 — V1 절감의 1차 KPI는 Transport-level Sonnet avoidance
 
 - Status: ACCEPTED
-- Decision: 서로 다른 태스크의 평균 비용보다, 기존 정책상 Sonnet 대상이었던 resolution chain 중 Sonnet 호출 없이 종료된 비율을 V1 핵심 KPI로 사용한다.
-- Rationale: 태스크 난이도와 길이가 달라도 각 routing opportunity의 baseline decision과 actual route는 일관되게 집계할 수 있다.
-- Guardrails: Internal-first rate, Sonnet fallback rate, Internal call amplification, token-weighted avoidance, success/error/latency를 함께 본다.
-- Consequence: 사내 모델 호출 횟수만으로 절감을 주장하지 않는다. 내부 모델 시도 후 Sonnet fallback은 successful avoidance가 아니다.
-- Consequence: 동일 작업을 Sonnet으로 중복 실행하지 않고 versioned baseline policy를 metadata로 기록한다.
+- Decision: V1은 실제 task 성공을 아직 상관관계로 증명하지 못하므로, 기존 정책상 Sonnet 대상이었던 routing chain 중 자동 Sonnet 호출 없이 정상 종료된 비율을 1차 KPI로 사용한다.
+- Name: `Transport-level Sonnet avoidance rate` 또는 `Sonnet-free resolution rate`.
+- Rationale: 태스크 난이도와 길이가 달라도 baseline decision과 actual route는 일관되게 집계할 수 있으며, transport 정상 종료를 업무 성공으로 과장하지 않는다.
+- Guardrails: Internal-first rate, Sonnet fallback rate, Internal call amplification, token-weighted avoidance, error/latency를 함께 본다.
+- Consequence: 사내 모델 호출 횟수만으로 절감을 주장하지 않는다. 내부 모델 시도 후 Sonnet fallback은 avoidance가 아니다.
+- Consequence: V1에는 최소 `routing_chain_id`가 필요하고, task/session/test success correlation은 V2로 미룬다.
 
 ## D-012 — 비용 환산과 task-level 평가는 단계적으로 확장
 
 - Status: ACCEPTED
 - Decision: `Sonnet baseline 대비 추정 외부 비용 회피액`을 2차 지표로 사용하며 `확정 절감액`이라고 표현하지 않는다.
 - Rationale: 실제 Sonnet 호출 시 출력 길이, 재시도, 성공률이 달라질 수 있어 counterfactual 비용은 추정치다.
-- V1: routing opportunity/resolution chain 수준의 Sonnet avoidance를 측정한다.
-- V2: session/test/result correlation 후 task-level success와 Cost per Successful Task를 추가한다.
+- V1: routing opportunity/routing chain 수준의 transport avoidance를 측정한다.
+- V2: session/test/result correlation 후 `Successful Sonnet avoidance`와 Cost per Successful Task를 추가한다.
 - Consequence: Cost per Successful Task는 V1 필수 Gate가 아니다.
+
+## D-013 — 역할별 GitHub 권한과 evidence handoff를 분리
+
+- Status: ACCEPTED
+- Decision: `CHATGPT_ORCHESTRATOR`, `EXTERNAL_CODEX`, `INTERNAL_VALIDATOR`, `HUMAN_GATE_OWNER`의 권한을 고정한다.
+- Internal: 사내 코딩 에이전트는 pull-only `INTERNAL_VALIDATOR`이며 source/Task/STATUS/Gate 수정, branch/commit/push/PR을 하지 않는다.
+- External: Android/Termux Codex가 활성 Task 범위의 구현과 GitHub branch/PR을 담당한다.
+- Orchestration: ChatGPT는 sanitized evidence를 검토해 canonical GitHub 문서를 관리하며, 사내 검증을 실행한 것처럼 기록하지 않는다.
+- Human: 사용자가 사내 evidence 전달, Gate와 다음 Task를 최종 승인한다.
+- Rationale: secret boundary, exact commit evidence, GitHub 상태의 단일성을 유지한다.
+
+## D-014 — 새 설계 세션은 GitHub canonical 문서로 무상태 복원
+
+- Status: ACCEPTED
+- Decision: 새 ChatGPT 설계 세션은 이전 대화 기억에 의존하지 않고 `DESIGN_SESSION_PLAYBOOK.md`의 읽기 순서와 Context checksum으로 상태를 복원한다.
+- Rationale: 긴 대화의 요약 손실과 세션 간 해석 차이를 줄인다.
+- Consequence: 거대한 `SESSION_SUMMARY.md`를 중복 유지하지 않고, 현재 상태는 project-state/STATUS/Task, 승인 결정은 DECISIONS에 기록한다.
+- Consequence: Chat에서만 합의된 내용은 GitHub 반영 전까지 proposal이며 accepted decision이 아니다.
+
+## D-015 — 현재 Gemma V1 upstream protocol은 Chat Completions로 한정
+
+- Status: ACCEPTED_FOR_CURRENT_GEMMA_PROVIDER
+- Decision: 현재 사내 Gemma Provider의 V1 공식 upstream protocol을 `openai_chat_completions`로 고정하고 Auto detect를 끈다.
+- Evidence: Direct Chat Completions PASS, CCR Chat Completions PASS, CCR OpenAI Responses HTTP 500.
+- Responses: 현재 `UNSUPPORTED_OR_INCOMPATIBLE`, V1 non-blocking, 별도 compatibility 또는 인프라 확인으로 유예한다.
+- Rationale: 하나의 검증된 upstream protocol로 Provider/gateway/stream/tool contract를 진행할 수 있고 Claude Code 연동에 Responses가 필수라는 증거가 없다.
+- Boundary: 이 결정은 현재 Gemma Provider에 한정하며 GLM이나 다른 Provider의 protocol을 영구 제한하지 않는다.
+- UX: 부분 protocol 성공을 더 명확히 보여주는 개선은 후보지만 현재 Core patch를 만들지 않는다.
