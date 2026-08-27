@@ -3,7 +3,7 @@ id: V1-S1-T01
 stage: V1-S1
 title: Internal Gemma provider connection check
 kind: spike
-status: blocked
+status: in_progress
 session_role: validation
 internal_validation: required
 depends_on:
@@ -23,285 +23,225 @@ human_decision: pending
 
 ## Validation question
 
-> Stock CCR가 사내 Windows에서 source 수정 없이 사내 OpenAI-compatible Gemma Provider 한 개를 저장하고, 해당 host에서 사용 권한이 있는 credential로 선택한 모델 한 개의 CCR `Check Connection` 실제 요청을 통과할 수 있는가?
+> Stock CCR가 사내 Windows에서 source 수정 없이 사내 OpenAI-compatible Gemma Provider 한 개를 저장하고, host-authorized credential로 선택한 모델 한 개의 지원 protocol 연결을 통과할 수 있는가?
+
+## Current result
+
+Credential host-scope blocker는 신규 key로 해소되었다.
+현재까지 확인된 protocol capability는 다음과 같다.
+
+```text
+Direct OpenAI Chat Completions request: PASS
+CCR OpenAI Chat Completions Check Connection: PASS
+CCR OpenAI Responses Check Connection: FAIL — HTTP 500
+```
+
+현재 V1 Gemma 공식 upstream protocol:
+
+```text
+openai_chat_completions
+```
+
+OpenAI Responses는 현재 `UNSUPPORTED_OR_INCOMPATIBLE`이며 V1-S1-T01의 non-blocking deferred capability다.
+Provider 저장·영속화, logging safety, stop, product diff/final git status가 아직 최종 확인되지 않아 Task는 `in_progress`다.
 
 ## Why now
 
 V1-S0에서 Stock CCR의 Windows install, build, CLI start/stop이 통과했다.
-현재 사내 serving 환경에서는 Gemma를 먼저 사용할 수 있고 GLM은 아직 rollout 대기 중이므로,
-모델 순서를 아키텍처에 고정하지 않고 사용 가능한 Gemma부터 최소 Provider 계약을 확인한다.
+Gemma는 현재 serving 환경에서 먼저 사용할 수 있고 GLM은 rollout 대기 중이다.
+이 Task는 local gateway client, streaming, tools, Claude Code로 확대하기 전에 Provider-level 최소 연결만 닫는다.
 
-Attempt 1에서 Claude Code 사용 후보 PC에 개인 PC의 source-IP 범위로 발급된 credential을 사용해 `401`이 발생했다.
-이는 CCR protocol 또는 Gemma model 실패 증거가 아니라 validation host와 credential 실행 범위가 일치하지 않은 운영 blocker다.
+## Roles
+
+```text
+INTERNAL_VALIDATOR
+→ 사내 Windows에서 pull-only 검증과 sanitized 결과 반환
+
+CHATGPT_ORCHESTRATOR
+→ 사용자에게 전달받은 결과로 Task/STATUS/Gate/Issue 갱신
+```
+
+Internal Validator는 GitHub 파일을 수정하거나 commit/push하지 않는다.
+상세 기준은 `company/docs/ROLES_AND_HANDOFF.md`와 `company/docs/INTERNAL_VALIDATION.md`를 따른다.
 
 ## Required knowledge
 
 - `docs/src/content/docs/en/configuration/providers.md`
 - `docs/src/content/docs/en/configuration/api-keys.md`
+- `packages/core/src/providers/probe.ts`
 - `packages/cli/README.md`
+- `company/docs/ROLES_AND_HANDOFF.md`
 - `company/docs/SECURITY.md`
 - `company/docs/INTERNAL_VALIDATION.md`
 - `company/docs/ENVIRONMENTS.md`
 - `company/gates/V1-S1.md`
 
-## Host capability preflight
-
-Provider request 전에 다음 세 권한을 서로 독립적으로 판정한다.
-
-```text
-WINDOWS_RUNTIME_ALLOWED
-→ CCR를 build/run할 수 있는가
-
-LLM_CREDENTIAL_AUTHORIZED_FOR_HOST
-→ credential이 현재 host의 실제 outbound identity/source scope에서 허용되는가
-
-CLAUDE_CODE_EXECUTION_ALLOWED
-→ 이 host에서 Claude Code 사용이 승인되었는가
-```
-
-이 Task의 진행 조건:
+## Confirmed host capabilities
 
 ```text
 WINDOWS_RUNTIME_ALLOWED = YES
 LLM_CREDENTIAL_AUTHORIZED_FOR_HOST = YES
-CLAUDE_CODE_EXECUTION_ALLOWED = NOT_REQUIRED
+CLAUDE_CODE_EXECUTION_ALLOWED = YES
 ```
 
-다만 이후 V1-S2 E2E까지 같은 PC에서 이어가려면 세 조건이 모두 `YES`인 host를 우선 선택한다.
-Credential scope는 local IP가 아니라 NAT/proxy egress, device 또는 account policy일 수 있으므로 실제 발급/allowlist 기준은 serving 운영자에게 확인한다.
+Provider check에는 앞의 두 capability가 필요하다.
+세 번째 capability는 이후 Claude Code E2E에서 사용한다.
 
-## Current blocker
+## Protocol evidence
+
+CCR `v3.0.22` probe는 protocol별로 서로 다른 request를 보낸다.
 
 ```text
-Result: BLOCKED_CREDENTIAL_HOST_SCOPE
-Observed response: 401
-Credential: PRESENT
-Validation host authorization: NO
+openai_chat_completions
+→ POST /v1/chat/completions
+→ messages + max_tokens
+
+openai_responses
+→ POST /v1/responses
+→ input + max_output_tokens
 ```
 
-실제 host/IP, endpoint, key, model ID는 외부 Evidence에 기록하지 않는다.
+Observed result:
 
-해결 가능한 승인 경로:
+| Protocol | Result | V1 meaning |
+|---|---|---|
+| `openai_chat_completions` | `PASS` | Gemma V1 official upstream protocol |
+| `openai_responses` | `FAIL`, HTTP `500` | `UNSUPPORTED_OR_INCOMPATIBLE`, non-blocking, deferred |
 
-1. 선택한 validation host의 outbound identity에 허용된 별도 credential을 발급받는다.
-2. 운영 승인 절차를 통해 기존 credential의 allowed host/source scope를 확장한다.
-3. 정책상 허용된다면 credential이 이미 유효한 다른 사내 Windows host에서 Provider-only 검증을 수행한다. 단, V1-S2 Claude Code E2E는 Claude Code 승인 host에서 다시 검증한다.
+Chat Completions PASS로 다음이 확인됐다.
 
-금지:
+- 현재 host/source scope에서 credential 사용 가능
+- CCR에서 사내 Gateway까지 network/TLS path 가능
+- Gemma model 식별과 권한 가능
+- CCR Chat Completions probe request 가능
 
-- key 공유 또는 우회 전달
-- source-IP/host allowlist 우회
-- 승인되지 않은 proxy/tunnel 사용
-- 실제 key를 repository, Issue, PR, log에 기록
+Responses 500만으로 다음을 확정하지 않는다.
+
+- 사내 Gateway가 모든 Responses 요청을 공식 미지원
+- CCR Responses 구현 결함
+- 특정 vLLM replica 고장
+
+추후 분류:
+
+```text
+PowerShell /v1/responses도 실패
+→ INTERNAL_GATEWAY_UNSUPPORTED_OR_INCOMPATIBLE
+
+PowerShell /v1/responses는 성공하고 CCR만 실패
+→ CCR_RESPONSES_COMPATIBILITY
+```
+
+이 추가 확인은 현재 Task와 V1 진행을 막지 않는다.
 
 ## In scope
 
-- build/runtime 검증을 통과한 exact product commit 또는 동등한 product tree 사용
-- 적합한 사내 Windows host와 credential scope 사전 확인
-- CCR management service와 gateway 시작
-- CCR UI에서 custom Gemma Provider 한 개를 non-sensitive alias로 생성
-- 사내 API 계약에 맞는 protocol, endpoint, credential, Gemma model 한 개를 runtime config에 입력
-- 해당 모델 한 개만 `Check Connection`으로 실제 요청
-- 선택한 protocol 이름과 sanitized 결과 기록
-- CCR service 정상 종료
-- 제품 코드와 lockfile 무변경 확인
+- exact tested product commit 또는 동등 product tree 기록
+- Chat Completions 전용 Gemma Provider 설정
+- Auto detect protocols OFF
+- Provider 저장과 reopen/refresh 후 영속화 확인
+- Request logs / Agent observability 안전 상태 확인
+- CCR 정상 종료
+- 제품 source와 lockfile 무변경 확인
+- sanitized evidence 반환
 
 ## Out of scope
 
-- 실제 endpoint, key, model ID, host/IP를 GitHub에 기록
-- credential allowlist 우회 또는 권한 변경 구현
-- Provider credential pool, usage connector, local limits
-- CCR client API key 생성
-- local gateway를 통한 client request
+- `Connect agent`
+- `Let's start`
+- CCR client API key
+- local gateway basic completion
 - streaming
 - tool call/result continuation
-- 오류 matrix 전체
+- full error matrix
+- `/v1/responses` root-cause investigation
 - GLM Provider
-- Claude Code 연결
-- Wrapper, Static Economy, Telemetry, V2 구현
-- 사내 source/dependency/script 수정
+- Claude Code 실행
+- Wrapper/Routing/Telemetry/V2 구현
+- source/dependency/script 수정
+- Internal Validator의 GitHub write
 
-## Runtime aliases
-
-외부 Evidence에서는 실제 내부 값을 다음 alias로만 표현한다.
+## Required operating configuration
 
 ```text
 Provider alias: internal_gemma
 Model alias: internal_gemma_primary
-Endpoint: REDACTED_INTERNAL
-Credential: PRESENT / ABSENT
-Credential host scope: AUTHORIZED / MISMATCH / UNKNOWN
-Validation host: approved_alias_only
+Protocol detection mode: manual
+Auto detect protocols: OFF
+Selected protocol: openai_chat_completions only
+OpenAI Responses selected for operation: NO
 ```
 
-## Windows preflight
+실제 endpoint, key, model ID, host/IP, management URL/token은 외부 Evidence에 기록하지 않는다.
 
-```powershell
-$TestedCommit = git rev-parse HEAD
+## Remaining internal finalization
 
-git status --short
-node --version
-npm --version
-node -p "process.platform"
-node -p "process.arch"
-
-$Cli = "packages/cli/dist/main/cli.js"
-$CliExists = Test-Path $Cli
-$CliExists
-```
-
-진행 조건:
-
-```text
-process.platform = win32
-Node major >= 22 and LTS
-working tree = clean
-CLI entrypoint exists = True
-TestedCommit 또는 동등 product tree = 기록됨
-LLM credential scope for current host = AUTHORIZED
-```
-
-Credential scope가 `MISMATCH` 또는 `UNKNOWN`이면 real request를 반복하지 않고 `BLOCKED_CREDENTIAL_HOST_SCOPE`로 종료한다.
-
-## Runtime validation
-
-### 1. CCR management service와 gateway 시작
-
-```powershell
-node $Cli start --no-open
-$StartExit = $LASTEXITCODE
-$StartExit
-```
-
-Authenticated management URL과 token은 로컬 브라우저에서만 사용한다.
-
-### 2. Gemma Provider 생성
-
-CCR UI의 Provider 설정에서:
-
-1. `Other / custom API endpoint`를 선택한다.
-2. 외부 보고에서는 Provider를 `internal_gemma`로만 표현한다.
-3. 실제 사내 endpoint와 현재 host에 사용 허가된 credential을 입력한다.
-4. 사내 API 계약과 일치하는 protocol을 선택한다.
-5. Gemma model 한 개만 추가한다.
-6. Provider를 저장한다.
-
-### 3. Connection check
-
-`Check Connection`에서 방금 추가한 Gemma model 한 개만 선택한다.
-
-기록:
-
-```text
-Selected protocol
-Connection check: PASS / FAIL / BLOCKED
-Credential host scope: AUTHORIZED / MISMATCH / UNKNOWN
-Sanitized diagnostic category
-Provider alias
-Model alias
-```
-
-금지 기록:
-
-```text
-Endpoint
-API key
-Actual model ID
-Raw request/response
-Prompt/response content
-Authenticated management URL/token
-Internal hostname, IP, proxy
-```
-
-### 4. 종료와 source 무변경 확인
-
-```powershell
-node $Cli stop
-$StopExit = $LASTEXITCODE
-
-git diff --exit-code -- packages package.json package-lock.json
-$ProductDiffExit = $LASTEXITCODE
-
-git status --short
-```
+1. 현재 repository HEAD와 clean working tree를 기록한다.
+2. 기존 Provider를 중복 생성하지 않고 Chat Completions 전용으로 저장한다.
+3. Provider 목록 또는 reopen/refresh 후 설정이 유지되는지 확인한다.
+4. `Connect agent`와 `Let's start`는 수행하지 않는다.
+5. 실제 사용자 prompt 전에 Request logs와 Agent observability를 OFF로 유지한다.
+6. CCR를 `stop`으로 종료한다.
+7. product diff와 final git status를 확인한다.
+8. `ROLES_AND_HANDOFF.md` 형식으로 sanitized 결과만 반환한다.
 
 ## Acceptance criteria
 
-- [ ] exact tested product commit 또는 동등 product tree 기록
-- [ ] working tree clean
-- [ ] `WINDOWS_RUNTIME_ALLOWED = YES`
-- [ ] `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST = YES`
-- [ ] CCR start with gateway exit `0`
-- [ ] custom Gemma Provider 한 개 저장
-- [ ] actual selected protocol 기록
-- [ ] Gemma model 한 개의 `Check Connection` 결과 기록
-- [ ] Connection check `PASS`
+- [ ] exact final tested product commit 또는 동등 product tree 기록
+- [ ] working tree before finalization clean
+- [x] `WINDOWS_RUNTIME_ALLOWED = YES`
+- [x] `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST = YES`
+- [x] `CLAUDE_CODE_EXECUTION_ALLOWED = YES`
+- [x] CCR management service와 gateway 시작 가능
+- [x] actual selected operational protocol 기록: `openai_chat_completions`
+- [x] Gemma model 한 개의 Chat Completions `Check Connection` PASS
+- [x] Responses HTTP 500을 non-blocking deferred capability로 분리
+- [ ] custom Gemma Provider 저장
+- [ ] reopen/refresh 후 Provider 영속화
+- [ ] Auto detect OFF와 Chat-only 설정 확인
+- [ ] Request logs / Agent observability 안전 상태 확인
 - [ ] CCR stop exit `0`
 - [ ] 제품 코드와 lockfile 무변경
-- [ ] secrets, host/IP, raw internal evidence가 외부에 기록되지 않음
-
-## Internal validation contract
-
-- Required: Yes
-- Expected state before test: `BLOCKED` until credential/host scope is aligned
-- Result values: `PASS`, `FAIL`, `BLOCKED`, `UNVERIFIED_INTERNAL`
-- 사내에서는 source, dependency, script를 수정하지 않는다.
-- runtime Provider 설정은 `%APPDATA%`의 CCR data에만 저장한다.
-- host-scope mismatch는 protocol/auth implementation 실패와 분리한다.
+- [ ] final Git status clean
+- [x] secret, actual host/IP, raw internal evidence가 외부에 기록되지 않음
+- [x] Connect agent / Let's start 미진행
 
 ## Failure classification
 
-- `CREDENTIAL_HOST_SCOPE`
-- `HOST_NOT_APPROVED`
+- `PROVIDER_PERSISTENCE`
+- `PROTOCOL_COMPATIBILITY`
 - `CCR_STARTUP`
-- `PROVIDER_CONFIG`
+- `SHUTDOWN`
+- `PRODUCT_DIFF`
 - `NETWORK_OR_PROXY`
 - `TLS_OR_CERTIFICATE`
 - `AUTHORIZATION`
 - `MODEL_NOT_FOUND`
-- `PROTOCOL_COMPATIBILITY`
 - `RATE_LIMIT`
 - `UPSTREAM_5XX`
 - `TIMEOUT`
 - `UNKNOWN`
 
-`AUTHORIZATION`은 현재 host에 credential 사용 권한이 확인된 뒤에도 401/403이 발생할 때만 사용한다.
-Host scope가 맞지 않으면 `CREDENTIAL_HOST_SCOPE`로 분류한다.
-
-## Stop conditions
-
-- 현재 validation host에 허용된 credential이 없음
-- source 수정 없이는 Provider를 저장하거나 check할 수 없음
-- 실제 endpoint/key/model 권한이 준비되지 않음
-- 사내 정책으로 connection check를 수행할 수 없음
-- protocol을 추측해야만 진행할 수 있고 사내 API 계약을 확인할 수 없음
-- secret 또는 raw internal evidence를 외부로 옮겨야만 진단 가능함
-
-## Rollback
-
-- CCR service를 `stop`으로 종료한다.
-- 필요하면 UI에서 테스트 Provider를 삭제하되 runtime DB 파일을 직접 편집하지 않는다.
-- source checkout은 수정하지 않는다.
+Responses HTTP 500은 현재 `PROTOCOL_COMPATIBILITY` 관찰이지만 V1 Chat-only Provider의 failure가 아니다.
 
 ## Attempts
 
-| Attempt | Session role | Commit | Internal | Recommendation |
-|---:|---|---|---|---|
-| 1 | validation | product tree validated in V1-S0 | `BLOCKED_CREDENTIAL_HOST_SCOPE` — credential was not authorized for the selected validation host/source identity and request returned 401 | `RETRY` — obtain an approved credential for the selected host or use a policy-approved credential-authorized host |
+| Attempt | Role | Evidence | Recommendation |
+|---:|---|---|---|
+| 1 | `INTERNAL_VALIDATOR` | 기존 credential이 선택한 host/source scope에서 허용되지 않아 `401` | `RETRY` with approved credential |
+| 2 | `INTERNAL_VALIDATOR` | 신규 host-authorized key; direct Chat PASS; CCR Chat PASS; CCR Responses HTTP 500 | `CONTINUE` — finalize persisted Chat-only Provider, stop, clean-tree evidence |
 
 ## Evidence / limitations
 
 - V1-S0 validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
-- Stock CCR Windows install/build/runtime smoke: `PASS`
-- Gemma is the first currently available model for V1-S1 transport validation.
-- GLM serving rollout is pending; model order is an availability decision, not an architecture dependency.
-- Attempt 1 proves only that the supplied credential is not usable from the selected host/source scope.
-- Attempt 1 does not prove a CCR protocol defect, invalid Gemma model, or general API authorization failure.
-- A PASS here proves only Provider-level basic connectivity for one Gemma model.
+- Attempt 2 exact final tested HEAD는 finalization handoff에서 다시 기록한다.
+- Chat PASS는 Provider-level basic connectivity만 증명한다.
+- Local gateway client completion, streaming, tools, Claude Code compatibility는 증명하지 않는다.
+- Responses 지원 여부는 인프라 공식 계약 또는 별도 compatibility Task가 필요하다.
+- Auto-detect UX 개선은 현재 Core patch 대상이 아니다. Company-managed config에서는 Chat-only manual selection을 사용한다.
 
 ## Codex recommendation
 
-`BLOCKED` — align the Gemma credential's approved host/source scope with the selected validation host, then repeat only this Task. Prefer a Claude Code-approved PC whose outbound identity is also authorized so later E2E can reuse the same runtime setup.
+`CONTINUE` — Internal Validator가 Provider 저장·영속화, logging safety, stop, product diff와 clean status만 마무리한다. 이후 Human Gate가 `V1-S1-T01` 수용 여부를 결정한다.
 
 ## Human decision
 
