@@ -29,7 +29,7 @@ Git·문서·에이전트 제어는 native Termux에서 계속 수행하고, nat
 
 - Status: `RECHECK`
 - Scope: Internal Windows source install validation
-- Applies to: CCR `v3.0.22`, Microsoft Windows 11 Enterprise reported as `10.0.2231`, Node `v24.15.0`, npm `11.12.1`, x64
+- Applies to: CCR `v3.0.22`, Windows 11 Enterprise, Node `v24.15.0`, npm `11.12.1`, x64
 - Symptom: 첫 `npm ci`가 exit `0`을 반환했지만 `node_modules/.bin`이 없었고 후속 typecheck에서 `tsc`가 인식되지 않음
 - Root cause: `UNKNOWN` — 단일 관찰이며 재현되지 않음
 - Avoid: `npm ci` exit code와 함께 실제 typecheck/build/runtime 명령을 반드시 실행해 설치 무결성을 확인함
@@ -40,6 +40,24 @@ Git·문서·에이전트 제어는 native Termux에서 계속 수행하고, nat
 
 `RECHECK`는 확정된 CCR 또는 npm 결함을 뜻하지 않는다.
 동일 증상이 반복 재현되거나 원인이 확인되기 전까지 검증 절차상의 주의사항으로만 취급한다.
+
+## TRAP-003 — Host-scoped credential의 401을 protocol failure로 오분류하지 말 것
+
+- Status: `ACTIVE`
+- Scope: Internal Provider/gateway/model validation
+- Applies to: V1-S1 이후의 사내 LLM 요청
+- Symptom: Credential은 존재하지만 발급 범위와 다른 validation host/source identity에서 요청하면 `401`이 발생함
+- Root cause: Credential이 특정 PC, source IP, NAT/proxy egress, account 또는 model entitlement scope에 묶여 있음
+- Avoid: model request 전 `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST` preflight를 수행하고, 선택한 host에 승인된 credential을 정식 발급받거나 승인된 scope 확장 절차를 사용함
+- Detect: serving 운영 정책상 credential의 allowed host/source scope가 현재 validation host와 일치하지 않음; 실제 값은 외부에 기록하지 않음
+- Classification: `BLOCKED_CREDENTIAL_HOST_SCOPE`
+- Do not classify as: `PROTOCOL_COMPATIBILITY`, generic `AUTHORIZATION`, CCR source defect, model defect
+- Recovery: 승인된 host/credential 조합으로 같은 Task만 재실행함. Key 공유, proxy/tunnel, allowlist 우회는 사용하지 않음
+- Evidence: `V1-S1-T01` Attempt 1, Issue #15; selected validation host에서 401이 발생했고 credential은 다른 host/source scope에 한정됨
+- Recheck when: credential 발급 또는 allowlist 정책이 변경되거나 host-independent credential이 제공됨
+
+Provider-only Task는 credential-authorized Windows host에서 수행할 수 있다.
+Claude Code E2E는 추가로 `CLAUDE_CODE_EXECUTION_ALLOWED`가 있는 host에서 수행해야 한다.
 
 ## Template
 

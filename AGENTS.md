@@ -12,6 +12,7 @@
 6. `current.task_path`가 가리키는 활성 Task를 읽는다.
 7. 활성 Task의 `Required knowledge`만 추가로 읽는다.
 8. install/build/start, native dependency, OS-specific 검증이 있으면 `company/docs/ENVIRONMENTS.md`를 읽고 실행환경 적합성을 먼저 판정한다.
+9. 사내 Provider/model/Claude Code 요청이 있으면 `company/docs/SECURITY.md`와 `company/docs/INTERNAL_VALIDATION.md`를 읽고 host capability matrix를 먼저 판정한다.
 
 문서가 서로 충돌하면 임의로 해석하지 말고 작업을 중단한 뒤 충돌을 보고한다.
 
@@ -23,6 +24,7 @@
 - 기준 변경이 필요하면 구현을 멈추고 변경 제안만 기록한다.
 - `project-state.yml`의 current Task/Stage를 자동으로 전진시키지 않는다.
 - Codex는 Recommendation과 Evidence를 작성할 수 있지만 Stage Gate와 최종 의사결정은 사람이 승인한다.
+- 모델 순서를 기억이나 과거 문서로 추측하지 않고 활성 Task를 따른다. Serving availability에 따라 Gemma/GLM 순서가 바뀔 수 있다.
 
 ## Environment suitability
 
@@ -33,6 +35,23 @@
 - 환경 조건이 맞지 않으면 이미 알려진 실패 명령을 반복하지 말고 preflight 결과만 보고한다.
 - 환경 문제를 통과시키기 위한 source/dependency patch를 하지 않는다.
 - 사내 Windows에서는 코드를 수정하지 않고 exact candidate commit만 검증한다.
+
+## Internal host capabilities
+
+사내 Windows PC의 권한을 다음 세 항목으로 분리한다.
+
+```text
+WINDOWS_RUNTIME_ALLOWED
+LLM_CREDENTIAL_AUTHORIZED_FOR_HOST
+CLAUDE_CODE_EXECUTION_ALLOWED
+```
+
+- Provider/gateway/stream/tool Task에는 앞의 두 항목이 필요하다.
+- Claude Code E2E에는 세 항목이 모두 필요하다.
+- Credential이 존재한다는 사실만으로 현재 host에서 사용할 수 있다고 가정하지 않는다.
+- Host/source scope가 `MISMATCH` 또는 `UNKNOWN`이면 real model request를 반복하지 않는다.
+- Scope mismatch의 401/403은 `BLOCKED_CREDENTIAL_HOST_SCOPE`로 기록하며 protocol, model 또는 CCR source failure로 분류하지 않는다.
+- Host scope가 `AUTHORIZED`로 확인된 뒤에도 401/403이 발생할 때만 일반 `AUTHORIZATION` failure를 검토한다.
 
 ## Architecture boundary
 
@@ -60,11 +79,13 @@ Core 변경은 활성 Task가 명시적으로 허용한 경우만 가능하며
 ## Security and evidence
 
 - 실제 사내 endpoint, hostname/IP/proxy, credential, model ID, 권한/RPM,
-  prompt, source, raw tool output, 사용자 식별자, 계약 가격을 commit하지 않는다.
+  credential이 허용된 실제 PC/source identity, prompt, source, raw tool output,
+  사용자 식별자, 계약 가격을 commit하지 않는다.
 - 실행하지 않은 검사를 PASS로 기록하지 않는다.
 - 사내에서만 확인 가능한 결과는 `READY_FOR_INTERNAL_VALIDATION`,
   `UNVERIFIED_INTERNAL`, 또는 `BLOCKED`로 기록한다.
 - Raw internal evidence는 사내에만 보관한다.
+- Key 공유, allowlist 우회, 승인되지 않은 proxy/tunnel/relay를 제안하거나 구현하지 않는다.
 
 ## Temporary work reports
 
@@ -85,10 +106,11 @@ Core 변경은 활성 Task가 명시적으로 허용한 경우만 가능하며
 4. Acceptance Criteria 상태
 5. Core patch 여부
 6. 미검증 항목과 내부 검증 명령
-7. 알려진 제한과 Trap 후보
-8. commit SHA 또는 working tree 상태
-9. 임시 AI work report 정리 여부
-10. 다음 Task를 시작하지 않았다는 확인
+7. Host capability matrix와 blocker category
+8. 알려진 제한과 Trap 후보
+9. commit SHA 또는 working tree 상태
+10. 임시 AI work report 정리 여부
+11. 다음 Task를 시작하지 않았다는 확인
 
 ## Code review priorities
 
@@ -97,7 +119,9 @@ Core 변경은 활성 Task가 명시적으로 허용한 경우만 가능하며
 3. CCR Native 기능의 중복 구현
 4. 불필요한 Core 변경
 5. 내부정보 유출
-6. Acceptance Criteria 약화
-7. 미래 Stage를 위한 과도한 abstraction
-8. 실행환경과 증거 범위의 혼동
-9. 테스트·rollback·문서 증거 누락
+6. Credential 공유 또는 host allowlist 우회
+7. Host-scope blocker와 protocol failure의 혼동
+8. Acceptance Criteria 약화
+9. 미래 Stage를 위한 과도한 abstraction
+10. 실행환경과 증거 범위의 혼동
+11. 테스트·rollback·문서 증거 누락

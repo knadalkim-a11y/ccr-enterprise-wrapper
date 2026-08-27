@@ -19,8 +19,9 @@ workflow:
 current:
   stage: V1-S1
   task_id: V1-S1-T01
-  task_path: company/tasks/v1-s1/V1-S1-T01-GLM-PROVIDER-CHECK.md
-  status: ready_internal
+  task_path: company/tasks/v1-s1/V1-S1-T01-GEMMA-PROVIDER-CHECK.md
+  status: blocked
+  blocker: credential_host_scope
 
 next: null
 

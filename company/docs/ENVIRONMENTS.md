@@ -45,31 +45,83 @@ Native Termux
 사내에서는 개발하지 않고 정확한 candidate commit을 pull하여 test-only로 검증한다.
 현재 프로젝트의 실제 target environment이므로 build와 runtime 증거의 기본 환경이다.
 
-### V1-S0에서 검증할 항목
+### Host capability matrix
 
-- Node `>=22`이며 LTS release line인지
-- 실제 사용한 Node/npm 버전 기록
+모든 사내 Windows PC가 동일한 권한을 갖는다고 가정하지 않는다.
+다음 capability를 독립적으로 판정한다.
+
+| Capability | Meaning |
+|---|---|
+| `WINDOWS_RUNTIME_ALLOWED` | CCR source/build/runtime을 실행할 수 있음 |
+| `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST` | 사용할 credential이 현재 host의 실제 source/egress scope에서 허용됨 |
+| `CLAUDE_CODE_EXECUTION_ALLOWED` | 해당 PC에서 Claude Code 사용이 승인됨 |
+
+Task별 요구사항:
+
+| Validation | Required capabilities |
+|---|---|
+| Stock install/build/runtime | `WINDOWS_RUNTIME_ALLOWED` |
+| Provider connection, gateway, streaming, tools | `WINDOWS_RUNTIME_ALLOWED` + `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST` |
+| Claude Code E2E | 세 capability 모두 |
+
+Provider-only 검증과 Claude Code E2E는 정책상 서로 다른 host에서 수행할 수 있다.
+다만 E2E까지 같은 runtime data를 재사용하려면 세 capability를 모두 가진 host를 우선한다.
+
+### Credential source identity
+
+Credential의 허용 범위는 반드시 local adapter IP와 같다고 가정하지 않는다.
+실제 판정 기준은 다음 중 하나일 수 있다.
+
+```text
+PC/device identity
+source IP
+NAT egress
+proxy egress
+network segment
+user/account
+model entitlement
+```
+
+Serving 운영자 또는 발급 시스템 기준으로 현재 host의 실제 outbound identity와 allowed scope를 확인한다.
+실제 값은 repository에 기록하지 않고 다음 상태만 기록한다.
+
+```text
+AUTHORIZED
+MISMATCH
+UNKNOWN
+```
+
+`MISMATCH` 또는 `UNKNOWN`이면 real model request를 반복하지 않는다.
+
+### V1-S0에서 검증한 항목
+
+- Node `>=22` LTS release line
+- 실제 Node/npm 버전 기록
 - clean `npm ci`
 - `npm run typecheck`
 - `npm run build:assets`
 - 제품 코드와 lockfile 무변경
-- Stock CCR CLI/Desktop 시작·종료
-- 실제 설정 위치와 기본 로그 위치
+- Stock CCR CLI 시작·종료
+- 실제 설정/runtime directory 생성
 
-CCR root `package.json`은 Node `>=22`를 요구한다.
-검증 환경은 이 조건을 만족하는 LTS major를 사용하며, 현재 검증 시점에는 Node 22와 Node 24를 허용한다.
-사내에 이미 설치된 지원 LTS 버전이 있으면 그대로 먼저 검증하고, 실제 compatibility 실패 증거 없이 특정 major로 강제 교체하지 않는다.
-exact npm version은 upstream에서 pin하지 않으므로 Node 배포에 포함된 npm 버전을 기록해 사용한다.
+### V1-S1 이후 검증할 항목
 
-### 이후 Windows에서 검증할 항목
+- host-authorized credential preflight
+- 사내 OpenAI-compatible API의 Provider connection
+- gateway basic completion
+- streaming과 tool round-trip
+- 주요 availability 오류 분류
+- model별 권장 범위
 
-- 사내 승인 설치·업데이트 절차
-- Windows 설정 위치, 권한, 경로, 방화벽, 프록시, TLS
-- 사내 OpenAI-compatible API의 completion, streaming, tool round-trip
+### V1-S2에서 검증할 항목
+
+- Claude Code 승인 host 여부
+- 해당 host에서 유효한 LLM credential
 - Claude Code → CCR → 사내 모델 E2E
+- Windows 권한, 경로, 방화벽, proxy, TLS
 - rollback과 재설치
 
-### Preflight
+### Node / install preflight
 
 ```powershell
 git branch --show-current
@@ -93,44 +145,31 @@ process.platform = win32
 Node major >= 22
 Node release line = LTS
 working tree = clean
-정확한 candidate commit = 기록됨
+exact candidate commit = recorded
 ```
 
 ### Install integrity verification
 
 `npm ci`의 exit code `0`만으로 설치 성공을 확정하지 않는다.
-`V1-S0-T01`에서 첫 `npm ci`가 `0`을 반환했지만 `node_modules/.bin`이 없고 `tsc`를 실행할 수 없었던 단일 사례가 있었다.
+V1-S0에서 첫 `npm ci`가 `0`을 반환했지만 `node_modules/.bin`이 없고 `tsc`를 실행할 수 없었던 단일 사례가 있었다.
 `node_modules` 삭제 후 clean rerun에서는 정상 설치되었고 모든 검사가 통과했다.
 
-따라서 검증자는 반드시 다음을 함께 확인한다.
+따라서 다음을 함께 확인한다.
 
 ```text
 npm ci exit code
-+ 실제 후속 typecheck
-+ 실제 build 또는 runtime command
++ actual typecheck
++ actual build or runtime command
 ```
-
-필요할 때는 아래처럼 설치 도구 존재를 보조 확인할 수 있다.
-
-```powershell
-Test-Path node_modules\.bin\tsc.cmd
-```
-
-exit `0`인데 후속 도구가 없으면:
-
-1. 제품 코드나 dependency를 수정하지 않는다.
-2. `INSTALL_INTEGRITY_ANOMALY`로 기록한다.
-3. `node_modules`만 삭제하고 clean `npm ci`를 한 번 재시도한다.
-4. 최초 현상과 재시도 결과를 모두 Evidence에 남긴다.
-5. 반복 재현되기 전에는 CCR 또는 npm의 확정 결함으로 단정하지 않는다.
 
 ### Test-only 원칙
 
 - 사내에서 source, dependency, script를 수정하지 않는다.
-- 실패하면 정확한 commit SHA와 민감정보를 제거한 관찰만 외부 repair session으로 반환한다.
-- 사내 주소, 모델명, 인증정보, raw log는 외부 repository에 기록하지 않는다.
-- `npm ci`가 사내망 정책으로 실패하면 제품 결함으로 단정하지 않고 `NETWORK_OR_REGISTRY`로 분류한다.
-- Node 24에서 native dependency나 build가 실패하면 즉시 source를 수정하지 않고 `NODE_MAJOR_COMPATIBILITY` 가능성을 분리해 기록한다. 필요할 때만 Node 22 재검증을 비교 증거로 사용한다.
+- 실패하면 exact commit과 sanitized observation만 외부 repair session으로 반환한다.
+- 사내 endpoint, key, model ID, actual host/IP, proxy, raw log는 외부 repository에 기록하지 않는다.
+- `npm ci`가 사내망 정책으로 실패하면 `NETWORK_OR_REGISTRY`로 분류한다.
+- Credential host scope mismatch는 `CREDENTIAL_HOST_SCOPE`로 분류하고 protocol/product defect로 단정하지 않는다.
+- 다른 PC용 key를 복사하거나 allowlist를 우회하지 않는다.
 
 공식 Windows release 실행은 Stock runtime feasibility를 빠르게 확인하는 보조 방법이다.
 Company code를 배포하기 전에는 source checkout의 build 검증도 별도로 필요하다.
@@ -144,18 +183,16 @@ Company code를 배포하기 전에는 source checkout의 build 검증도 별도
 - 사내 반입 전에 Windows installer/package를 미리 검증해야 함
 - internal failure가 OS 문제인지 source 문제인지 구분할 보조 증거가 필요함
 
-PRoot Linux는 선택적 실험 환경일 뿐 기본 경로가 아니다.
-PRoot 성공은 Windows 동작을 증명하지 않으며, PRoot 실패도 곧바로 CCR source defect를 뜻하지 않는다.
+보조 runner는 사내 LLM credential 또는 Claude Code 사용 권한을 자동으로 갖지 않는다.
 
 ## Task별 기본 환경
 
 | 작업 | 기본 환경 | 선택적 보조 환경 |
 |---|---|---|
 | 설계, Git, Task, 리뷰 | Native Termux | 없음 |
-| Stock install/typecheck/build | 사내 Windows | 별도 PC/CI/PRoot |
-| CLI/Desktop smoke | 사내 Windows | 외부 Windows |
-| 사내 Provider/모델 | 사내 Windows | 대체 불가 |
-| Claude Code E2E | 사내 Windows | 외부 mock은 보조만 |
+| Stock install/typecheck/build | 사내 Windows runtime host | 별도 PC/CI/PRoot |
+| Provider/gateway/stream/tool | credential-authorized 사내 Windows host | 없음 또는 정책 승인 host |
+| Claude Code E2E | Claude Code 승인 + credential-authorized Windows host | 대체 불가 |
 
 ## AI Work Report
 
