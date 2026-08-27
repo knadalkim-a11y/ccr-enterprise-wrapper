@@ -61,7 +61,7 @@ Provider-only 검증과 Claude Code E2E는 서로 다른 PC에서 수행할 수 
 
 | Item | Status | Evidence |
 |---|---|---|
-| Company repository foundation | PASS | foundation `9c117d73aa9732e599aeb4e706566` 기록은 BOOT evidence 참조 |
+| Company repository foundation | PASS | foundation `9c117d73aa9732e599e5a2b685090aeb4e706566` |
 | CCR upstream history | PASS | PR #5 merge; pinned ancestry 보존 |
 | CCR repository structure | PASS | source, build, docs, license, company layer 존재 |
 | Stock CCR internal Windows build | PASS | `V1-S0-T01`; npm ci, typecheck, build:assets, product diff exit `0` |
