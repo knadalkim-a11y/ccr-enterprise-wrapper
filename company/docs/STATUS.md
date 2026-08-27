@@ -1,7 +1,7 @@
 # Project Status
 
 `company/project-state.yml`이 현재 Stage/Task의 기계 판독 기준이다.
-이 문서는 사람이 이해해야 할 확인 사실, blocker, 다음 결정을 기록한다.
+이 문서는 사람이 이해해야 할 확인 사실, blocker, 미검증 범위와 정확한 다음 행동을 기록한다.
 
 ## Baseline
 
@@ -10,8 +10,9 @@
 - Upstream history integrated: `YES`
 - Integration main commit: `b05567891e15a157d8e54fac627618f8214128a7`
 - Wrapper version: `pre-v1`
-- Development control: Android/Termux
-- Primary validation environment: Internal Windows, test only
+- Development control: Android/Termux External Codex
+- Primary validation environment: Internal Windows, pull-only test
+- GitHub orchestration: ChatGPT Orchestrator + Human Gate Owner
 - GitHub Actions: `DISABLED` — upstream workflows 검토 전까지 유지
 
 ## Current
@@ -19,47 +20,109 @@
 - Stage: `V1-S1`
 - Active Task: `V1-S1-T01`
 - Active model: `Gemma first`
-- Status: `BLOCKED`
-- Blocker: `CREDENTIAL_HOST_SCOPE`
-- Goal: Stock CCR에서 사내 Gemma custom Provider 한 개와 모델 한 개의 basic `Check Connection`을 source 수정 없이 검증
+- Status: `IN_PROGRESS`
+- Blocking precondition: `NONE` — 신규 credential의 current-host 사용 가능성 확인
+- Goal: Chat Completions 전용 Gemma Provider의 저장·영속화·안전 종료·clean-tree evidence로 Provider-level Task를 닫음
 - V1-S0 validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 
-## Current operating constraint
-
-사내 LLM credential은 모든 사내 PC에서 공통으로 사용할 수 있는 값이 아니라,
-발급 정책에 따라 특정 host, source IP, NAT/proxy egress, device 또는 account scope에 묶일 수 있다.
-현재 사용 가능한 credential은 선택한 validation host의 outbound scope에 허용되지 않아 `401`이 발생했다.
-
-이 결과는 다음을 뜻하지 않는다.
+## Collaboration roles
 
 ```text
-CCR protocol failure
-Gemma model failure
-일반적인 API authorization implementation failure
+CHATGPT_ORCHESTRATOR
+→ 설계·GitHub canonical 상태 관리
+
+EXTERNAL_CODEX
+→ Android/Termux 구현·branch/commit/PR
+
+INTERNAL_VALIDATOR
+→ 사내 Windows pull-only 검증; GitHub write/source 수정 금지
+
+HUMAN_GATE_OWNER
+→ 사내 evidence 전달·Gate·다음 Task 승인
 ```
 
-현재 분류:
+상세 규칙은 `company/docs/ROLES_AND_HANDOFF.md`를 따른다.
+새 설계 세션은 `company/docs/DESIGN_SESSION_PLAYBOOK.md`로 상태를 복원한다.
+
+## Current Gemma Provider evidence
+
+신규 host-authorized credential로 다음이 확인됐다.
 
 ```text
-BLOCKED_CREDENTIAL_HOST_SCOPE
+Direct OpenAI Chat Completions: PASS
+CCR OpenAI Chat Completions Check Connection: PASS
+CCR OpenAI Responses Check Connection: FAIL — HTTP 500
 ```
 
-## Host capability model
+현재 판정:
 
-사내 Windows PC의 역할은 다음 세 권한으로 분리한다.
+```text
+Credential host scope: AUTHORIZED
+Gemma Chat Completions: SUPPORTED
+OpenAI Responses: UNSUPPORTED_OR_INCOMPATIBLE
+Responses V1 gating: NON_BLOCKING
+```
 
-| Capability | Meaning | V1-S1 Provider check | V1-S2 Claude Code E2E |
-|---|---|---:|---:|
-| `WINDOWS_RUNTIME_ALLOWED` | CCR를 build/run할 수 있음 | Required | Required |
-| `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST` | credential이 현재 host/source scope에서 허용됨 | Required | Required |
-| `CLAUDE_CODE_EXECUTION_ALLOWED` | 해당 PC에서 Claude Code 사용이 승인됨 | Not required | Required |
+현재 V1 Gemma 운영 protocol:
 
-Provider-only 검증과 Claude Code E2E는 서로 다른 PC에서 수행할 수 있다.
-다만 E2E까지 같은 설정을 재사용하려면 세 권한이 모두 있는 host를 우선 선택한다.
+```text
+Protocol detection mode: manual
+Auto detect protocols: OFF
+Selected protocol: openai_chat_completions only
+```
+
+Chat PASS로 확인된 범위:
+
+- API key와 현재 host/source scope 사용 가능
+- CCR에서 사내 Gateway까지 network/TLS path 가능
+- Gemma model 식별·권한 가능
+- CCR Chat Completions probe 가능
+
+아직 최종 확인이 필요한 범위:
+
+- Provider 저장
+- reopen/refresh 후 영속화
+- Request logs / Agent observability 안전 상태
+- CCR stop exit `0`
+- product diff exit `0`
+- final Git status clean
+- exact final tested HEAD
+
+## Protocol decision
+
+OpenAI Responses HTTP 500은 현재 다음 중 하나다.
+
+```text
+사내 Gateway의 /v1/responses 미지원 또는 비호환
+CCR Responses request/response contract와 사내 Gateway 간 비호환
+```
+
+현재 증거만으로 특정 vLLM replica, CCR defect 또는 전체 Gateway 미지원을 확정하지 않는다.
+V1은 Gemma의 공식 upstream protocol을 `openai_chat_completions`로 한정하고 Responses 원인 분석을 별도 non-blocking 확인으로 유예한다.
+
+## Confirmed facts
+
+| Item | Status | Evidence |
+|---|---|---|
+| Company repository foundation | PASS | foundation `9c117d73aa9732e599e5a2b685090aeb4e706566` |
+| CCR upstream history | PASS | PR #5 merge; pinned ancestry 보존 |
+| CCR repository structure | PASS | source, build, docs, license, company layer 존재 |
+| Stock CCR internal Windows build | PASS | `V1-S0-T01`; npm ci, typecheck, build:assets, product diff exit `0` |
+| Stock CCR Windows runtime smoke | PASS | `V1-S0-T02`; CLI help/start/stop와 runtime directory 생성 확인 |
+| V1-S0 Gate | ACCEPTED | install/build/start/stop without product source changes |
+| Credential/host scope model | CONFIRMED | credential validity depends on approved host/source scope |
+| Current Gemma credential host scope | PASS | direct Chat와 CCR Chat 실제 요청 성공 |
+| Gemma Chat Provider connection | PASS_CANDIDATE | CCR Chat Completions Check Connection PASS; persistence/cleanup pending |
+| OpenAI Responses compatibility | DEFERRED_NON_BLOCKING | CCR Responses HTTP 500; `UNSUPPORTED_OR_INCOMPATIBLE` |
+| GLM serving availability | DEFERRED | serving rollout 대기; availability-driven onboarding |
+| Gateway basic completion | UNVERIFIED | Provider Task 완료 후 별도 Task |
+| Streaming/tool contract | UNVERIFIED | later V1-S1 Tasks |
+| Claude Code E2E | UNVERIFIED | V1-S2, all host capabilities required |
+| Managed Local Fleet topology | DESIGN_DEFAULT | PC별 Local CCR data plane, 중앙 analytics plane 분리 |
+| Non-developer setup target | DESIGN_ACCEPTED | installer/launcher/doctor가 수동 CCR 설정 제거 |
+| Fleet telemetry boundary | DESIGN_ACCEPTED | metadata allowlist; prompt/response/source/raw DB 중앙 수집 금지 |
 
 ## Accepted future operating design
-
-현재 Task와 무관하게 향후 V1 운영 방향은 다음으로 결정됐다.
 
 ```text
 N명의 사용자
@@ -76,38 +139,16 @@ Fleet analytics plane
 사용자는 CCR UI, endpoint, protocol, model, upstream key, start/stop을 직접 다루지 않는다.
 Company installer/launcher/doctor가 PC 단위 설치·설정·업데이트를 담당한다.
 
-V1 절감의 1차 KPI:
+V1 1차 절감 지표는 task 성공이 아니라 transport-level 범위로 제한한다.
 
 ```text
-Successful Sonnet avoidance rate
+Transport-level Sonnet avoidance rate
 =
 기존 정책상 Sonnet 대상 중
-Sonnet 호출 없이 resolution chain이 종료된 비율
+자동 Sonnet 호출 없이 routing chain이 정상 종료된 비율
 ```
 
-`Sonnet baseline 대비 추정 외부 비용 회피액`은 2차 지표이며 확정 절감액으로 표현하지 않는다.
-상세 설계는 `company/docs/FLEET_OPERATING_MODEL.md`를 따른다.
-
-## Confirmed facts
-
-| Item | Status | Evidence |
-|---|---|---|
-| Company repository foundation | PASS | foundation `9c117d73aa9732e599e5a2b685090aeb4e706566` |
-| CCR upstream history | PASS | PR #5 merge; pinned ancestry 보존 |
-| CCR repository structure | PASS | source, build, docs, license, company layer 존재 |
-| Stock CCR internal Windows build | PASS | `V1-S0-T01`; npm ci, typecheck, build:assets, product diff exit `0` |
-| Stock CCR Windows runtime smoke | PASS | `V1-S0-T02`; CLI help/start/stop와 runtime directory 생성 확인 |
-| V1-S0 Gate | ACCEPTED | internal Windows install/build/start/stop demonstrated without product source changes |
-| Credential/host scope model | CONFIRMED | credential validity depends on approved execution host/source scope |
-| Gemma Provider connection check | BLOCKED_CREDENTIAL_HOST_SCOPE | selected validation host에서 credential scope mismatch로 `401`; protocol check 미완료 |
-| GLM serving availability | DEFERRED | serving rollout 대기; 현재 active model order는 Gemma first |
-| Managed Local Fleet topology | DESIGN_ACCEPTED | PC별 Local CCR data plane, 중앙 analytics plane 분리 |
-| Non-developer setup target | DESIGN_ACCEPTED | installer/launcher/doctor가 사용자 수동 CCR 설정을 제거 |
-| Fleet telemetry boundary | DESIGN_ACCEPTED | metadata allowlist; prompt/response/source/raw DB 중앙 수집 금지 |
-| Savings primary KPI | DESIGN_ACCEPTED | Successful Sonnet avoidance + fallback/amplification guardrail |
-| Gateway basic completion | UNVERIFIED | Gemma Provider check 이후 별도 Task |
-| Streaming/tool contract | UNVERIFIED | later V1-S1 Tasks |
-| Claude Code E2E | UNVERIFIED | Claude Code 승인 host + host-authorized credential 필요 |
+Task-level `Successful Sonnet avoidance`와 `Cost per Successful Task`는 V2에서 session/test/result correlation 후 사용한다.
 
 ## V1-S0 final evidence
 
@@ -123,15 +164,14 @@ Sonnet 호출 없이 resolution chain이 종료된 비율
 
 ## Open risks
 
-- Imported upstream workflows are not yet approved for this repository. Keep GitHub Actions disabled.
-- Credential 발급 범위가 validation host와 일치하지 않으면 Provider, gateway, streaming, tool, Claude Code 검증이 모두 401에서 차단될 수 있다.
-- `401`은 host scope가 확인되기 전에는 protocol/auth implementation 실패로 분류하지 않는다.
-- 실제 source identity는 local IP가 아니라 NAT/proxy egress일 수 있으므로 serving 운영자 기준 확인이 필요하다.
-- GLM rollout은 아직 완료되지 않았다. GLM-specific task는 service availability가 확인된 뒤 새로 생성한다.
-- Gemma Provider `Check Connection` output may include internal diagnostics; only sanitized categories may be returned externally.
+- Imported upstream workflows are not approved. Keep GitHub Actions disabled.
+- Responses protocol의 공식 사내 지원 여부는 아직 확인되지 않았다.
+- 실제 사용자 prompt 전에 Request logs와 Agent observability/body capture를 OFF로 검증해야 한다.
+- Provider `Check Connection` PASS만으로 local gateway, streaming, tools, Claude Code compatibility를 증명할 수 없다.
+- GLM rollout과 GLM-specific onboarding은 아직 완료되지 않았다.
 - Stock CCR `%APPDATA%`가 사용자 프로필 범위이므로 multi-user Windows에서 PC당 Runtime 하나를 만드는 방식은 V1-S3에서 검증해야 한다.
-- CCR의 공식 metadata export/event interface와 Company exporter 구현 경로는 아직 검증되지 않았다.
-- Pilot 전 baseline policy version과 resolution-chain 성공 판정을 고정해야 한다.
+- CCR의 공식 metadata export/event interface와 최소 routing-chain correlation은 아직 검증되지 않았다.
+- Pilot 전 executable baseline policy와 telemetry deduplication schema를 고정해야 한다.
 - 사용자별 감사가 필수인지 PC 단위 통계로 충분한지 운영 요구가 아직 확정되지 않았다.
 
 ## Last passed gate
@@ -148,12 +188,17 @@ Sonnet 호출 없이 resolution chain이 종료된 비율
 - Tested product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Date: `2026-08-27`
 
-## Next action
+## Exact next action
 
-1. Gemma validation을 수행할 사내 Windows host를 선택한다.
-2. Serving 운영 기준에서 그 host의 실제 outbound identity/source scope를 확인한다.
-3. 해당 host에서 허용되는 별도 credential을 발급받거나 승인된 절차로 기존 scope를 확장한다.
-4. 정책상 허용된다면 이미 credential이 유효한 다른 Windows host에서 Provider-only check를 수행할 수 있다.
-5. Claude Code E2E는 반드시 `WINDOWS_RUNTIME_ALLOWED`, `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST`, `CLAUDE_CODE_EXECUTION_ALLOWED`가 모두 충족되는 host에서 수행한다.
-6. Scope가 정렬된 뒤 `V1-S1-T01-GEMMA-PROVIDER-CHECK.md`만 재실행한다.
-7. GLM은 serving rollout이 완료된 뒤 별도 onboarding Task를 만든다.
+Internal Validator가 `V1-S1-T01`의 종료 검증만 수행한다.
+
+1. exact HEAD와 clean working tree 기록
+2. 기존 Gemma Provider를 Chat-only/manual로 저장
+3. reopen/refresh 후 Provider 영속화 확인
+4. Request logs와 Agent observability OFF 확인
+5. `Connect agent`와 `Let's start` 미진행
+6. CCR stop
+7. product diff와 final Git status 확인
+8. GitHub write 없이 sanitized handoff 반환
+
+그 결과를 Human Gate Owner가 ChatGPT Orchestrator에게 전달한 뒤에만 `V1-S1-T01` 수용과 다음 Task를 결정한다.

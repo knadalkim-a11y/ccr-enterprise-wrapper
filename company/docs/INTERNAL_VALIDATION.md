@@ -1,22 +1,55 @@
 # Internal Validation
 
-사내 환경은 개발이 아니라 검증만 수행한다.
+## 역할
+
+사내 코딩 에이전트의 공식 역할은 다음이다.
+
+```text
+Role: INTERNAL_VALIDATOR
+```
+
+이 역할은 이름과 무관하게 **코딩하지 않는 pull-only test agent**다.
+사내 환경은 개발, repair, GitHub 문서 관리가 아니라 exact commit의 검증만 수행한다.
 
 ```text
 External implementation
 → exact candidate commit
-→ internal detached checkout
+→ internal pull/detached checkout
 → host capability preflight
-→ documented commands
+→ documented commands/UI steps
 → PASS / FAIL / BLOCKED
-→ sanitized result
+→ sanitized text handoff
+→ ChatGPT Orchestrator가 GitHub 반영
 ```
 
-```bash
-git fetch origin
+상세 역할 경계는 `company/docs/ROLES_AND_HANDOFF.md`를 따른다.
+
+## 허용되는 Git 동작
+
+```powershell
+git fetch --prune origin
+git pull --ff-only origin <approved-branch>
 git checkout --detach <TESTED_COMMIT_SHA>
+git rev-parse HEAD
 git status --short
+git diff --exit-code -- <approved-paths>
 ```
+
+## 금지되는 동작
+
+```text
+branch 생성
+git add / commit / push
+git merge / rebase / reset --hard
+Issue / PR 생성·수정
+Task / STATUS / Gate / project-state 수정
+product source/dependency/script/lockfile 수정
+runtime DB 직접 편집
+repository 안에 AI_WORK_REPORT.md 또는 임시 파일 생성
+```
+
+Working tree가 dirty하면 임의로 삭제·복구하지 않는다.
+변경 경로를 보고하고 검증을 중단한다.
 
 ## Host capability preflight
 
@@ -37,7 +70,7 @@ Task별 요구사항:
 | Claude Code E2E | 세 capability 모두 |
 
 Capability가 부족하면 실제 model request를 반복하지 않고 `BLOCKED`로 종료한다.
-서로 다른 host에서 증거를 수집할 수 있지만, 각 Evidence에는 실제 값 대신 capability 충족 여부와 host alias만 기록한다.
+서로 다른 host에서 증거를 수집할 수 있지만, 외부 Evidence에는 실제 값 대신 capability 충족 여부와 승인된 alias만 기록한다.
 
 Credential scope는 local IP와 다를 수 있다.
 NAT/proxy egress, device, account 또는 model entitlement가 기준일 수 있으므로 serving 운영 정책을 확인한다.
@@ -72,27 +105,63 @@ BLOCKED_POLICY
 
 Host-scope mismatch는 CCR protocol 또는 model failure로 기록하지 않는다.
 
-## 금지
+## 검증 수행 원칙
 
-- 사내 product code 수정
-- endpoint/key/model ID/actual host/IP/raw evidence 반출
-- 다른 commit 결과 재사용
-- 미검증 PASS
-- key 복사·공유 또는 allowlist 우회
-- 승인되지 않은 proxy/tunnel/relay 사용
+- 활성 Task에 문서화된 명령과 UI 단계만 수행한다.
+- 한 세션에서는 검증 질문 하나만 다룬다.
+- 이미 확인된 실패 명령을 다른 조건 변화 없이 반복하지 않는다.
+- 실패를 통과시키기 위해 endpoint, protocol, source, dependency를 임의 변경하지 않는다.
+- Provider 설정 같은 runtime 변경은 Task가 허용한 UI를 통해서만 수행한다.
+- actual endpoint/key/model/host와 raw request/response는 사내 로컬에만 유지한다.
+- Task가 끝나면 service stop, product diff, final git status를 가능한 범위에서 확인한다.
 
 ## Evidence 반환
 
-FAIL/BLOCKED의 raw evidence는 사내에 유지하고 다음만 외부로 반환한다.
+Internal Validator는 GitHub 파일을 수정하지 않는다.
+Human Gate Owner에게 다음 형식의 sanitized text만 반환한다.
 
 ```text
-Task ID
-exact tested commit
-capability matrix: YES / NO / UNKNOWN
-provider/model aliases
-selected protocol when known
-PASS / FAIL / BLOCKED
-failure category
-reproducibility
-sanitized observation
+Role: INTERNAL_VALIDATOR
+Task ID:
+Session role: internal validation
+Exact tested commit:
+Environment alias:
+Capability matrix: YES / NO / UNKNOWN
+Commands/UI steps performed:
+Exit codes / PASS / FAIL / BLOCKED:
+Protocol/provider/model aliases:
+Failure classification:
+Reproducibility:
+Product diff:
+Final git status:
+Sanitized observation:
+Secrets/raw evidence exported: NO
+Git write performed: NO
+Next Task started: NO
 ```
+
+외부로 반환하지 않는 항목:
+
+```text
+endpoint/key/actual model ID
+actual host/IP/proxy/egress
+management URL/token
+Windows user/account identifier
+raw prompt/response/source/tool result
+raw log/DB/trace
+```
+
+## Handoff 이후
+
+```text
+Internal Validator
+→ Human Gate Owner에게 sanitized result
+
+Human Gate Owner
+→ ChatGPT Orchestrator에게 전달
+
+ChatGPT Orchestrator
+→ Task/STATUS/Gate/Issue 갱신 또는 External Codex repair 제안
+```
+
+Internal Validator는 결과가 PASS이더라도 다음 Task를 시작하지 않는다.

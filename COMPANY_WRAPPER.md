@@ -44,6 +44,25 @@ Credential이 다른 host/source scope에 묶여 발생한 401은 protocol failu
 사내 Windows에서 exact candidate를 build하고 실행하는 것은 개발이 아니라 test-only 검증이다.
 자세한 기준은 `company/docs/ENVIRONMENTS.md`를 따른다.
 
+## 협업 역할
+
+```text
+CHATGPT_ORCHESTRATOR
+→ 설계, 상태 복원, sanitized evidence 검토, GitHub canonical 문서 관리
+
+EXTERNAL_CODEX
+→ Android/Termux에서 Task 단위 구현·리뷰·branch/commit/PR
+
+INTERNAL_VALIDATOR
+→ 사내 Windows에서 pull-only test; GitHub write와 source 수정 금지
+
+HUMAN_GATE_OWNER
+→ 사내 권한·evidence 전달·Stage Gate·다음 Task 최종 승인
+```
+
+상세 권한과 handoff는 `company/docs/ROLES_AND_HANDOFF.md`를 따른다.
+사내 코딩 에이전트는 이름과 관계없이 `INTERNAL_VALIDATOR`이며 pull-only다.
+
 ## 현재 모델 순서
 
 모델 순서는 architecture가 아니라 serving availability를 따른다.
@@ -77,35 +96,54 @@ Company installer, launcher, doctor가 PC 단위 설치·설정·업데이트를
 중앙 통계 취합은 중앙 CCR Gateway를 의미하지 않는다.
 Local CCR의 장애 격리는 유지하고, prompt/response/source 없이 모델·토큰·fallback·오류 같은 metadata만 모은다.
 
-초기 절감의 1차 KPI는 서로 다른 태스크의 평균 비용이 아니라 다음이다.
+V1은 실제 task 성공을 아직 상관관계로 증명하지 못하므로 1차 지표를 다음처럼 제한한다.
 
 ```text
-Successful Sonnet avoidance rate
+Transport-level Sonnet avoidance rate
 =
 기존 정책상 Sonnet 대상 중
-Sonnet 호출 없이 resolution chain이 종료된 비율
+자동 Sonnet 호출 없이 routing chain이 정상 종료된 비율
 ```
 
+Task-level `Successful Sonnet avoidance`와 `Cost per Successful Task`는 session/test/result correlation이 있는 V2에서 사용한다.
 Sonnet fallback rate와 internal call amplification을 함께 보며,
 비용 환산은 `Sonnet baseline 대비 추정 외부 비용 회피액`이라는 2차 지표로만 표현한다.
 상세 기준은 `company/docs/FLEET_OPERATING_MODEL.md`를 따른다.
 
-## 새 세션 진입점
+## 새 구현·검증 세션 진입점
 
 1. `AGENTS.md`
+2. `company/docs/ROLES_AND_HANDOFF.md`
+3. `company/project-state.yml`
+4. `company/docs/PROJECT.md`
+5. `company/docs/STATUS.md`
+6. `company/docs/TRAPS.md`
+7. `project-state.yml`의 `current.task_path`
+8. 실행환경 검증이 있으면 `company/docs/ENVIRONMENTS.md`
+9. 사내 model/Claude Code 검증이면 `company/docs/SECURITY.md`, `company/docs/INTERNAL_VALIDATION.md`
+10. 설치·Fleet·Telemetry·절감 평가 Task이면 `company/docs/FLEET_OPERATING_MODEL.md`
+
+## 새 설계 세션 진입점
+
+이전 ChatGPT 대화의 기억을 전제로 하지 않는다.
+
+1. `company/docs/DESIGN_SESSION_PLAYBOOK.md`
 2. `company/project-state.yml`
-3. `company/docs/PROJECT.md`
-4. `company/docs/STATUS.md`
-5. `company/docs/TRAPS.md`
-6. `project-state.yml`의 `current.task_path`
-7. 실행환경 검증이 있으면 `company/docs/ENVIRONMENTS.md`
-8. 사내 model/Claude Code 검증이면 `company/docs/SECURITY.md`, `company/docs/INTERNAL_VALIDATION.md`
-9. 설치·Fleet·Telemetry·절감 평가 Task이면 `company/docs/FLEET_OPERATING_MODEL.md`
+3. `company/docs/STATUS.md`
+4. `company/docs/PROJECT.md`
+5. `company/docs/DECISIONS.md`
+6. `company/docs/STAGES.md`
+7. `company/docs/ROLES_AND_HANDOFF.md`
+8. 활성 Task와 Required knowledge
+
+새 설계 세션은 작업 전에 Context checksum을 보고한다.
+현재 상태를 별도 거대 세션 요약 파일에 복제하지 않고 canonical 문서에서 복원한다.
 
 CCR `v3.0.22` 원본 history와 Company foundation은 이미 하나의 `main` ancestry로 통합되었다.
 
 `AI_WORK_REPORT.md`는 임시 scratch로만 사용하며 commit하지 않는다.
 공식 작업 증거는 canonical Task의 `Attempts`, `Evidence`, `Recommendation`에 남긴다.
+Internal Validator는 repository 안에 report를 만들지 않고 sanitized text만 반환한다.
 
 CCR 사용법과 라이선스는 upstream 문서와 root `LICENSE`를 따른다.
 Company layer도 별도 표기가 없으면 동일 라이선스를 따른다.
