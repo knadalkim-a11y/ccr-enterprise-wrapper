@@ -100,30 +100,136 @@ GLM path는 GLM serving availability와 별도 Provider/gateway onboarding 후 �
 
 ## Wrapper V1
 
-### V1-S3 — Minimal Wrapper
+### V1-S3 — Managed Local Wrapper
 
-승인된 Native/Force Profile을 secret 없이 배포할 수 있는가?
+N명의 사용자가 M대의 승인 Windows PC에서 CCR 수동 설정 없이 사용할 수 있는가?
+
+최소 검증 질문:
+
+- Multi-user Windows에서 논리적으로 PC당 CCR Runtime 하나를 운영할 수 있는가?
+- Stock CCR의 `%APPDATA%` 사용자 범위를 공식 옵션, 전용 runtime account 또는 launcher 방식으로 안전하게 제어할 수 있는가?
+- 사용자가 endpoint, protocol, model, key, start/stop을 직접 다루지 않아도 되는가?
+- Provider/profile template과 host-authorized secret을 분리할 수 있는가?
+- PC별 version/policy/host alias와 최소 metadata event를 생성할 수 있는가?
+- raw prompt/response/source를 저장하거나 중앙 전송하지 않는가?
+
+해결 순서:
+
+```text
+CCR configuration / official option
+→ official extension/plugin
+→ Company wrapper/launcher
+→ 증거가 있을 때만 최소 Core patch
+```
+
+Gate는 한 대의 승인 PC에서 관리자 설치 후 비개발 사용자가 Company launcher만으로 시작할 수 있음을 요구한다.
 
 ### V1-S4 — Repeatable Setup / Doctor
 
-깨끗한 사내 Windows 환경에서 setup과 계층별 진단을 재현할 수 있는가?
-Doctor는 runtime, credential host scope, Claude Code host approval을 서로 다른 계층으로 진단한다.
+깨끗한 두 번째 사내 Windows PC에서 관리자 절차를 반복해 동일 결과를 만들 수 있는가?
 
-### V1-S5 — Safe Pilot
+Setup 최소 범위:
 
-소규모 사용자가 사내 Windows에서 CCR Native를 기본으로 실제 작업에 사용할 수 있는가?
+```text
+지원 Node/CCR/Wrapper version
+runtime/service 준비
+provider/profile template
+host-authorized credential 주입 경계
+Company launcher
+telemetry destination/config
+update/rollback metadata
+```
 
-### V1-S6 — Static Economy Experiment (Optional)
+Doctor는 다음을 독립적으로 진단한다.
 
-Sonnet-only / Native / Static을 비교해 Cost per Successful Task가 개선되는가?
+```text
+CCR install/runtime health
+config/profile version
+credential host scope
+model entitlement/connectivity
+Claude Code host approval
+local gateway health
+telemetry exporter/destination
+```
+
+Gate는 한 번의 문서화된 관리자 절차, idempotent 재실행, sanitized 결과, rollback을 요구한다.
+
+### V1-S5 — Managed Local Safe Pilot
+
+소수의 승인 PC와 사용자에서 Managed Local Fleet가 실제 운영 가능한가?
+
+초기 예시:
+
+```text
+2~3대 PC
+5~10명 사용자
+```
+
+Pilot 측정:
+
+- PC당 설치·업데이트·rollback 시간
+- 사용자 최초 실행 단계 수
+- 설정 오류와 지원 요청
+- config/version drift
+- credential 발급·갱신 운영 부담
+- PC/user 식별 요구 수준
+- metadata completeness
+- availability/error/latency
+- Internal-first rate
+- Successful Sonnet avoidance rate
+- Sonnet fallback rate
+- Internal call amplification
+
+초기 중앙 취합은 승인된 공유 경로의 daily JSON/CSV batch로 시작할 수 있다.
+실시간 Collector는 Pilot에서 필요성이 증명된 경우에만 만든다.
+
+Gate는 사용자가 CCR UI와 upstream key를 직접 다루지 않고, Fleet 상태와 routing KPI를 중앙에서 확인할 수 있음을 요구한다.
+
+### V1-S6 — Sonnet Avoidance Experiment (Optional)
+
+현재 운영 baseline과 CCR 정책을 실제 중복 실행 없이 비교할 수 있는가?
+
+비교 대상:
+
+```text
+Current baseline policy
+CCR Native
+Static Economy — 선택 실험
+```
+
+Primary KPI:
+
+```text
+Successful Sonnet avoidance rate
+=
+기존 정책상 Sonnet 대상 중
+Sonnet 호출 없이 resolution chain이 종료된 비율
+```
+
+Guardrail:
+
+```text
+Internal-first rate
+Sonnet fallback rate
+Internal call amplification
+Token-weighted avoidance
+Success/error/latency
+```
+
+`Sonnet baseline 대비 추정 외부 비용 회피액`은 2차 지표다.
+`Cost per Successful Task`는 V1 필수 Gate가 아니며 태스크 간 난이도 차이를 무시해 사용하지 않는다.
+
 실패 시 실험 정책만 폐기하며 Wrapper V1 실패로 보지 않는다.
 
 ## Wrapper V2
 
 ### V2-S0 — Session Correlation Feasibility
 
-Hook event와 CCR request를 동일 session으로 안정적으로 연결한다.
-실패하면 자동 개입을 중단한다.
+Hook event와 CCR request를 동일 session/task로 안정적으로 연결한다.
+실패하면 task-level 평가와 자동 개입을 중단한다.
+
+V1의 routing opportunity/resolution chain metadata와 연결되며,
+request-level Sonnet avoidance를 task-level 성공 지표로 확장할 수 있어야 한다.
 
 ### V2-S1 — Observe-only State
 
@@ -132,6 +238,7 @@ Hook event와 CCR request를 동일 session으로 안정적으로 연결한다.
 ### V2-S2 — Shadow Decision
 
 모델을 바꾸지 않고 `would_escalate_to_sonnet`의 오탐·미탐·예상 비용을 평가한다.
+Baseline policy version과 actual route를 함께 기록하며 동일 작업을 중복 실행하지 않는다.
 
 ### V2-S3 — Opt-in Sonnet Intervention
 
@@ -142,8 +249,14 @@ Hook event와 CCR request를 동일 session으로 안정적으로 연결한다.
 ```text
 CCR Native
 vs Native + Adaptive Quality
-vs Sonnet-only
+vs Sonnet-only baseline
 ```
 
-Release Gate: Native보다 성공률 개선, Sonnet-only보다 낮은 Cost per Successful Task,
-Manual Override 보호, Native fail-open.
+Release Gate:
+
+- Native보다 task success 개선
+- Successful Sonnet avoidance 보호
+- Sonnet fallback과 internal call amplification 허용 범위
+- Sonnet-only보다 낮은 Cost per Successful Task
+- Manual Override 보호
+- Native fail-open
