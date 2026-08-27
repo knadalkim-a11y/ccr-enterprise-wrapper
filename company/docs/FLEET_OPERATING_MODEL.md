@@ -2,7 +2,7 @@
 
 ## 목적
 
-이 문서는 다음 운영 문제를 하나의 설계로 정리한다.
+이 문서는 다음 운영 문제를 하나의 V1 기본 가설과 검증 계약으로 정리한다.
 
 ```text
 N명의 사용자
@@ -12,14 +12,13 @@ M대의 Claude Code 승인 Windows PC
 
 - 비개발자가 CCR endpoint, protocol, model, key를 직접 설정하지 않게 한다.
 - 각 PC의 Local CCR 안정성과 장애 격리를 유지한다.
-- M대에 분산된 모델 사용량과 라우팅 효과를 중앙에서 취합한다.
-- 서로 다른 태스크의 절대 비용을 억지로 비교하지 않고, 기존 정책상 Sonnet 대상이었던 라우팅 기회를 사내 모델이 얼마나 대체했는지 측정한다.
+- M대에 분산된 모델 사용량과 routing 효과를 privacy-safe 방식으로 중앙 취합한다.
+- 서로 다른 태스크의 절대 비용을 억지로 비교하지 않는다.
+- V1 transport 지표를 task 성공으로 과장하지 않는다.
 
-이 문서는 운영 목표와 검증 계약이다. Windows service account, machine-scoped data directory, exporter transport와 같은 구체 구현은 해당 Stage의 Task에서 검증한 뒤 확정한다.
+Windows service account, machine-scoped data directory, exporter source와 transport 같은 구현은 V1-S3 이후 Task에서 검증한 뒤 확정한다.
 
-## 선택한 V1 운영 토폴로지
-
-### Managed Local Fleet
+## V1 기본 토폴로지 가설
 
 ```text
 N명의 사용자
@@ -36,37 +35,36 @@ N명의 사용자
              │ metadata only
              ▼
 ┌──────────────────────────┐
-│ Central Telemetry        │
-│ - fleet aggregation      │
-│ - routing KPI            │
-│ - Sonnet avoidance       │
-│ - operational health     │
+│ Central Fleet Analytics  │
+│ - fleet health           │
+│ - model routing          │
+│ - transport avoidance    │
+│ - operational guardrail  │
 └──────────────────────────┘
 ```
-
-V1 기본 결정:
 
 ```text
 Model request data plane
 → PC별 Local CCR
 
 Fleet analytics plane
-→ 중앙 집계
+→ 중앙 metadata 집계
 ```
 
-중앙 통계 취합은 중앙 CCR Gateway를 의미하지 않는다.
+중앙 analytics는 중앙 CCR Gateway, key relay, SSO 또는 Control Plane을 의미하지 않는다.
+이 토폴로지는 `ACCEPTED_AS_V1_DEFAULT`이며 PC당 논리적 Runtime 가능성이 V1-S3에서 실패하면 재검토한다.
 
-### 사용자 경험 목표
+## 사용자와 관리자 경험
 
-사용자는 다음만 수행한다.
+### 사용자
 
 ```text
 1. 승인된 PC에 로그인
 2. Company Claude Code 바로가기 실행
-3. 필요한 작업 수행
+3. 작업 수행
 ```
 
-사용자가 직접 수행하지 않아야 하는 항목:
+사용자가 직접 수행하지 않는 항목:
 
 ```text
 Node/CCR 설치
@@ -80,9 +78,7 @@ Routing profile 편집
 Telemetry 설정
 ```
 
-### 관리자 경험 목표
-
-관리자 또는 사내 배포 도구가 PC 단위로 다음을 수행한다.
+### 관리자 또는 배포 도구
 
 ```text
 install
@@ -104,7 +100,7 @@ company-ccr rollback
 
 명령 이름과 구현 방식은 아직 확정하지 않는다.
 
-## PC 단위와 사용자 단위의 책임 분리
+## PC 단위와 사용자 단위
 
 ### PC 또는 Runtime 단위
 
@@ -112,7 +108,7 @@ company-ccr rollback
 - Provider/model/protocol template
 - Host/source scope에 승인된 upstream credential
 - Local service 시작 방식
-- Native/Force routing profile
+- Native/Force profile
 - Telemetry exporter와 host alias
 - Update/rollback 상태
 
@@ -120,33 +116,28 @@ company-ccr rollback
 
 - Claude Code 작업 세션
 - 사용자 명시적 model/profile override
-- 사용자별 감사가 필요한 경우의 local client identity
+- 감사 요구가 있을 때의 local client identity
 
-초기 Pilot에서는 PC 단위 식별로 시작할 수 있다.
-사용자별 사용량 감사가 필수라는 운영 요구가 확인된 경우에만 사용자별 CCR client key 또는 익명 identity provisioning을 추가한다.
+초기 Pilot은 PC 단위 alias로 시작한다.
+사용자별 감사가 필수라는 운영 요구가 확인된 경우에만 사용자별 CCR client identity 또는 pseudonymous provisioning을 추가한다.
 
 ## Windows 사용자 프로필 문제
 
-Stock CCR CLI runtime data는 Windows에서 기본적으로 다음 아래에 저장된다.
+Stock CCR CLI runtime data는 기본적으로 다음 아래에 저장된다.
 
 ```text
 %APPDATA%\claude-code-router
 ```
 
-따라서 N명이 각자의 Windows 계정으로 로그인하는 환경에서는 사용자별 runtime/config가 복제될 수 있다.
+여러 Windows 계정이 같은 PC를 이용하면 runtime/config가 사용자별로 복제될 수 있다.
+V1-S3에서 다음을 순서대로 검증한다.
 
-V1-S3에서 반드시 답해야 할 질문:
-
-> 여러 사용자가 공유하는 승인 PC에서 논리적으로 PC당 CCR Runtime 하나를 운영할 수 있는가?
-
-우선 검토 순서:
-
-1. CCR 공식 data-directory 또는 service 실행 옵션
+1. CCR 공식 data-directory 또는 service option
 2. 전용 Windows runtime/service account
 3. Company launcher가 고정 runtime을 사용하는 방식
 4. 증거가 있을 때만 최소 Core patch
 
-`%APPDATA%` 파일을 수동 복사하거나 실행 중인 SQLite를 직접 편집하는 방식은 운영 해법으로 사용하지 않는다.
+실행 중인 SQLite 직접 편집, 사용자 프로필 간 수동 복사, key 파일 복제를 운영 해법으로 사용하지 않는다.
 
 ## Credential 계층
 
@@ -159,8 +150,8 @@ Local CCR
 
 - Host, source IP, NAT/proxy egress, account 또는 model entitlement에 묶일 수 있다.
 - 일반 사용자에게 노출하지 않는다.
-- PC별, egress group별 또는 service account별 발급 단위는 serving 운영 정책에 따라 결정한다.
-- 승인되지 않은 key 공유, allowlist 우회, proxy/tunnel은 사용하지 않는다.
+- 발급 단위는 serving 운영 정책에 따라 PC별, egress group별, service account별로 결정한다.
+- Key 공유, allowlist 우회, 승인되지 않은 proxy/tunnel은 사용하지 않는다.
 
 ### CCR client credential
 
@@ -169,187 +160,219 @@ Claude Code client
 → Local CCR gateway
 ```
 
-Upstream LLM credential과 별개다.
-
-Pilot 기본안:
-
-```text
-PC당 local CCR client identity 하나
-```
-
-사용자별 감사가 필요하면:
-
-```text
-사용자별 local client identity
-→ 자동 provisioning
-→ 중앙에는 익명 ID만 전송
-```
-
+Upstream credential과 별개다.
+Pilot은 PC당 local client identity 하나로 시작할 수 있다.
+사용자별 감사가 필요하면 자동 provisioning과 pseudonymous alias를 검토한다.
 SSO/IAM 연계는 실제 요구와 지원 인프라가 확인되기 전에는 V1 범위에 넣지 않는다.
 
-## 중앙 Telemetry 원칙
+## 실제 사용자 요청 전 보안 선행조건
 
-### 중앙에 보내는 정보
-
-원칙적으로 요청 단위 raw event보다 짧은 시간 구간의 집계 event를 우선한다.
+CCR Request Log는 설정에 따라 request/response body를 로컬에 저장할 수 있다.
+Provider connectivity의 합성 `ping` 이후 실제 gateway prompt 또는 Claude Code E2E를 시작하기 전에 다음을 검증한다.
 
 ```text
-time window
-host alias
-wrapper version
-CCR version
+Request logs: OFF
+Agent observability: OFF
+또는
+requestLogBodyCapture: none
+```
+
+Company-managed profile의 기본값은 body capture OFF다.
+Raw Request Log, SQLite, trace file 전체를 중앙 exporter input으로 사용하지 않는다.
+
+## Telemetry source feasibility
+
+중앙 Collector나 Dashboard 구현 전에 다음 질문을 V1-S3 spike로 검증한다.
+
+> CCR Core를 수정하지 않고 request 종료 시점의 metadata를 안전하게 얻을 수 있는가?
+
+우선순위:
+
+1. CCR 공식 extension/event hook
+2. Local management API의 metadata-only read
+3. Company launcher/gateway wrapper가 생성하는 metrics event
+4. 마지막 수단으로 CCR version에 고정된 local storage read-only adapter
+
+공식 extension 문서에 request-completion event가 확인되지 않으면 지원된다고 가정하지 않는다.
+실행 중인 DB 직접 편집 또는 raw DB 중앙 복사는 금지한다.
+
+## 중앙 Telemetry boundary
+
+### 허용 후보
+
+```text
+schema_version
+event_id 또는 dedupe_key
+window_start / window_end
+generated_at
+complete / partial
+pseudonymous host alias
+wrapper / CCR / source commit
 policy version
-baseline policy version
+baseline policy version / rule ID
 baseline model class
 actual model alias
-request/resolution count
+routing chain count
 input/output token counts
 success/error count
 fallback count
-internal model call count
+internal logical model attempt count
+provider transport retry count
 latency summary
 sanitized error category
 ```
 
-사용자별 감사가 승인된 경우에만 pseudonymous user/client alias를 추가한다.
+사용자별 감사가 승인된 경우에만 pseudonymous client alias를 추가한다.
 
-### 중앙에 보내지 않는 정보
+### 중앙 전송 금지
 
 ```text
 prompt 또는 response body
 source code
 file path 또는 file name
 raw tool input/result
-실제 endpoint 또는 API key
-실제 내부 model ID
-실제 hostname/IP/proxy
-Windows user name 또는 사번
+실제 endpoint, API key, model ID
+실제 hostname/IP/proxy/egress
+Windows user name, 사번, 조직명
 management URL/token
-raw CCR database/log file
+raw CCR database/log/trace
 ```
 
-### Local log와 중앙 지표 분리
+### Batch deduplication
 
-CCR Request Log는 같은 날의 troubleshooting에는 유용하지만 장기 Fleet 통계의 Source of Truth로 그대로 사용하지 않는다.
-
-Company telemetry는 다음 우선순위로 구현한다.
-
-1. CCR 공식 extension/event/API
-2. Local management API의 metadata-only 조회
-3. Company wrapper가 생성하는 별도 metrics event
-4. 마지막 수단으로 version-pinned local storage read-only adapter
-
-실행 중인 SQLite 파일 직접 편집 또는 무단 복사는 금지한다.
-
-Company-managed profile에서는 raw request/response body의 저장과 중앙 전송을 기본 OFF로 설계한다.
-구체적인 CCR 설정 키와 exporter 인터페이스는 V1-S3/S5 Task에서 검증한다.
-
-## 절감 평가의 기본 단위
-
-### 태스크 간 절대 비용 비교를 1차 KPI로 사용하지 않음
-
-태스크는 난이도, 길이, 파일 수, 도구 호출 수가 다르므로 초기에는 다음을 중심 KPI로 사용하지 않는다.
+초기 daily JSON/CSV batch도 중복 전송을 고려한다.
+최소 dedupe key 후보:
 
 ```text
-평균 태스크 비용
-Cost per Successful Task
+host_alias
++ window_start
++ window_end
++ schema_version
++ sequence
 ```
 
-이 지표들은 session/task correlation과 성공 판정이 안정된 V2에서 보조 KPI로 사용한다.
+Exporter retry나 공유 폴더 재복사로 동일 집계가 이중 계산되지 않아야 한다.
 
-### Routing opportunity / resolution chain
+## V1 측정 단위
 
-V1의 측정 단위는 다음이다.
+### Routing chain
+
+V1은 전체 사용자 task가 아니라 하나의 자동 routing/fallback chain을 최소 단위로 사용한다.
 
 ```text
-Routing opportunity
-→ baseline policy라면 어떤 model class를 선택했는가
-→ 실제 첫 model은 무엇이었는가
-→ 내부 모델 호출이 몇 번 발생했는가
-→ Sonnet fallback이 발생했는가
-→ Sonnet 없이 resolution chain이 종료됐는가
+routing_chain_id
+→ baseline decision
+→ actual first model
+→ logical internal attempts
+→ provider transport retries
+→ automatic Sonnet fallback 여부
+→ chain 정상 종료 여부
 ```
 
-한 opportunity에서 내부 모델이 여러 번 호출돼도 하나의 resolution chain으로 집계한다.
-
-### Baseline
-
-Baseline은 결과를 본 뒤 임의로 바꾸지 않는다.
-각 event에 baseline policy version을 함께 기록한다.
-
-초기 Baseline 후보:
+필수 분리:
 
 ```text
-Company Wrapper 도입 전 현재 운영 정책
-→ 기존이면 Sonnet을 사용했을 routing opportunity
+logical_model_attempt_count
+provider_transport_retry_count
+automatic_fallback_to_sonnet
+manual_escalation_to_sonnet — 포착 가능할 때
+explicit_sonnet_from_start
 ```
 
-사용자가 명시적으로 model/profile을 선택한 요청은 자동 절감 KPI에서 별도 분리한다.
+Provider 429 재시도와 품질 문제로 인한 모델 escalation을 같은 증폭으로 계산하지 않는다.
 
+V2는 이 chain을 Claude Code session, task, test/result, 최종 성공과 연결한다.
+
+## Baseline contract
+
+Baseline은 실제 결과를 보기 전에 executable rule로 결정하고 version을 고정한다.
+
+최소 metadata:
+
+```text
+baseline_policy_version
+baseline_rule_id
+baseline_model_class
+sonnet_eligible
+eligibility_reason_code
+manual_override
+```
+
+초기 후보:
+
+```text
+pre-wrapper-sonnet-v1
+→ 사용자 명시적 override와 health check를 제외한
+  기존 자동 Claude Code model request는 Sonnet 대상
+```
+
+실제 운영 정책을 확인해 rule을 확정한다.
+결과를 본 뒤 사람이 임의로 `Sonnet 대상` 분모를 바꾸지 않는다.
 동일 작업을 Sonnet으로 중복 실행하지 않는다.
-Baseline decision만 metadata로 기록한다.
 
-## 핵심 KPI
+## V1 핵심 KPI
 
-### 1. Sonnet-eligible resolution count
-
-기존 기준 정책상 Sonnet 대상이었던 resolution chain 수.
+### 1. Sonnet-eligible chain count
 
 ```text
-sonnet_eligible_count
+sonnet_eligible_chain_count
 ```
 
 ### 2. Internal-first rate
 
 ```text
-internal_first_count
-──────────────────────
-sonnet_eligible_count
+internal_first_chain_count
+──────────────────────────
+sonnet_eligible_chain_count
 ```
 
-라우터가 Sonnet 대상 중 얼마나 사내 모델을 먼저 시도했는지 보여준다.
-
-### 3. Successful Sonnet avoidance rate — V1 핵심 KPI
+### 3. Transport-level Sonnet avoidance rate — V1 1차 KPI
 
 ```text
-resolved_without_sonnet_count
-─────────────────────────────
-sonnet_eligible_count
+sonnet_free_normal_chain_count
+────────────────────────────
+sonnet_eligible_chain_count
 ```
 
-V1의 `resolved_without_sonnet`은 다음 transport-level 의미로 제한한다.
+V1의 `sonnet_free_normal_chain`은 다음만 뜻한다.
 
-- resolution chain이 Sonnet 호출 없이 종료됨
-- availability 오류나 fallback으로 종료되지 않음
-- 정상 응답 또는 해당 단계의 검증 신호가 있음
+- 자동 Sonnet 호출 없이 chain 종료
+- availability error 또는 automatic fallback 종료가 아님
+- transport-level 정상 응답 또는 해당 단계의 검증 신호 존재
 
-이는 전체 사용자 태스크의 품질 성공을 보장하지 않는다.
-V2에서 test/result/session correlation을 추가해 task-level 성공으로 확장한다.
+전체 사용자 업무 품질 성공을 뜻하지 않는다.
+`Successful Sonnet avoidance`라는 명칭은 V2 task/test success correlation 이후에만 사용한다.
 
 ### 4. Sonnet fallback rate
 
 ```text
-fallback_to_sonnet_count
-────────────────────────
-internal_first_count
+automatic_fallback_to_sonnet_count
+──────────────────────────────────
+internal_first_chain_count
 ```
 
-사내 모델 우선 정책이 지나치게 공격적인지 보여준다.
+수동 Sonnet 전환을 연결할 수 있으면 별도 지표로 보고한다.
+V1에서 포착하지 못하면 dashboard limitation으로 명시한다.
 
 ### 5. Internal call amplification
 
 ```text
-internal_model_call_count
-─────────────────────────
-internal_first_resolution_count
+internal_logical_model_attempt_count
+────────────────────────────────────
+internal_first_chain_count
 ```
 
-Sonnet 호출은 줄었지만 내부 서빙 부하가 과도하게 증가하는지 확인한다.
+Transport retry는 별도 지표다.
 
-### 6. Token-weighted avoidance — 보조 KPI
+### 6. Input-token-weighted avoidance — 보조 KPI
 
-건수 회피율과 함께 input/output token 기준 workload 비율을 본다.
-작은 요청만 사내 모델이 처리하고 큰 요청은 계속 Sonnet이 처리하는 현상을 구분한다.
+```text
+sonnet_free_eligible_input_tokens
+──────────────────────────────────
+sonnet_eligible_input_tokens
+```
+
+Counterfactual output token은 직접 알 수 없으므로 V1은 입력 토큰 workload 비율을 우선한다.
 
 ### 7. Estimated external cost avoidance — 2차 KPI
 
@@ -358,32 +381,38 @@ Baseline Sonnet estimated cost
 - Actual external model estimated cost
 ```
 
-이 값은 다음 이름으로만 표현한다.
+표현은 다음으로 제한한다.
 
 ```text
 Sonnet baseline 대비 추정 외부 비용 회피액
 ```
 
 `확정 절감액`으로 표현하지 않는다.
-사내 모델의 내부 GPU/서빙 원가가 제공되면 별도 지표로 추가한다.
+사내 GPU/서빙 원가가 제공되면 별도 지표로 추가한다.
 
-## 최소 Event 예시
+## 최소 Batch 예시
 
 실제 값이나 사용자 정보가 아닌 alias만 사용한다.
 
 ```json
 {
-  "period": "hour",
+  "schema_version": 1,
+  "dedupe_key": "approved_pc_alias:window:sequence",
+  "window_start": "REDACTED_TIME_WINDOW",
+  "window_end": "REDACTED_TIME_WINDOW",
+  "complete": true,
   "host_alias": "approved_pc_alias",
+  "source_commit": "APPROVED_WRAPPER_SHA",
   "policy_version": "native-v1",
   "baseline_policy_version": "pre-wrapper-sonnet-v1",
-  "sonnet_eligible_count": 100,
-  "internal_first_count": 70,
-  "resolved_without_sonnet_count": 56,
-  "fallback_to_sonnet_count": 14,
-  "internal_model_call_count": 120,
-  "input_tokens_internal": 420000,
-  "output_tokens_internal": 52000,
+  "sonnet_eligible_chain_count": 100,
+  "internal_first_chain_count": 70,
+  "sonnet_free_normal_chain_count": 56,
+  "automatic_fallback_to_sonnet_count": 14,
+  "internal_logical_model_attempt_count": 120,
+  "provider_transport_retry_count": 4,
+  "sonnet_eligible_input_tokens": 600000,
+  "sonnet_free_eligible_input_tokens": 420000,
   "errors": {
     "availability": 2,
     "credential_scope": 0
@@ -391,17 +420,19 @@ Sonnet baseline 대비 추정 외부 비용 회피액
 }
 ```
 
-이 예시는 schema 확정이 아니다. Pilot Task에서 최소 필드를 검증한 뒤 versioned schema를 만든다.
+Schema는 Pilot Task에서 실제 metadata source를 확인한 뒤 versioned contract로 확정한다.
 
 ## 단계별 도입
 
-### V1-S3 — Managed Local Wrapper
+### V1-S3 — Managed Local Wrapper Feasibility
 
-- PC당 논리적 CCR Runtime 하나의 가능성 검증
+- PC당 논리적 CCR Runtime 가능성
 - Company launcher
 - Provider/profile template
 - Host-authorized secret 주입 경계
-- 최소 metadata event shape
+- Body capture OFF
+- metadata source feasibility
+- 최소 `routing_chain_id`와 event shape
 - 사용자에게 CCR UI와 key 설정을 요구하지 않음
 
 ### V1-S4 — Repeatable Setup / Doctor
@@ -410,10 +441,11 @@ Sonnet baseline 대비 추정 외부 비용 회피액
 - runtime/service/config version 검사
 - credential host scope 검사
 - Claude Code host approval 검사
-- telemetry destination/config 검사
+- local gateway health
+- telemetry source/destination 검사
 - update/rollback 검증
 
-### V1-S5 — Safe Pilot
+### V1-S5 — Managed Local Safe Pilot
 
 초기 예시:
 
@@ -422,18 +454,19 @@ Sonnet baseline 대비 추정 외부 비용 회피액
 5~10명 사용자
 ```
 
-Pilot에서 측정:
+Pilot 측정:
 
-- PC 설치 시간
+- PC 설치/업데이트/rollback 시간
 - 사용자 최초 실행 단계 수
 - 설정 오류/지원 요청
 - config drift
-- update/rollback 시간
 - host credential 운영 부담
-- metadata completeness
-- Sonnet avoidance/fallback/internal amplification
+- metadata completeness와 dedupe
+- transport-level Sonnet avoidance
+- fallback와 internal amplification
+- availability/error/latency
 
-초기 중앙 취합은 승인된 공유 경로의 daily JSON/CSV 같은 batch 방식으로 시작할 수 있다.
+초기 중앙 취합은 승인된 공유 경로의 daily JSON/CSV batch로 시작할 수 있다.
 실시간 Collector는 Pilot에서 필요성이 증명된 경우에만 만든다.
 
 ### V1-S6 — Sonnet Avoidance Experiment (Optional)
@@ -441,7 +474,7 @@ Pilot에서 측정:
 비교 대상:
 
 ```text
-Current baseline policy
+Current executable baseline policy
 CCR Native
 Static Economy — 선택 실험
 ```
@@ -449,35 +482,35 @@ Static Economy — 선택 실험
 1차 판단:
 
 ```text
-Successful Sonnet avoidance
+Transport-level Sonnet avoidance
 Fallback rate
-Internal call amplification
-Success/error/latency guardrail
+Internal logical call amplification
+Transport retry
+Input-token-weighted avoidance
+Error/latency guardrail
 ```
 
-Cost per Successful Task는 V1 필수 Gate가 아니다.
+Task-level success와 Cost per Successful Task는 V1 필수 Gate가 아니다.
 
 ### V2 — Session/Task-level Evaluation
 
-- request와 Claude Code session/task correlation
-- test 결과와 최종 성공 판정
-- task-level Successful Sonnet avoidance
+- routing chain과 Claude Code session/task correlation
+- test/result와 최종 성공 판정
+- `Successful Sonnet avoidance`
 - Cost per Successful Task
 - Adaptive Quality intervention 효과
 
-## 중앙 Gateway를 재검토할 조건
+## 중앙 Gateway 재검토 조건
 
-다음 운영 문제가 실제 Pilot에서 반복될 때만 Shared/Central Gateway를 별도 아키텍처 옵션으로 검토한다.
+다음 문제가 Pilot에서 실제로 반복될 때만 Shared/Central Gateway를 별도 옵션으로 검토한다.
 
-- M대 업데이트와 config drift가 지속적인 병목
+- M대 update와 config drift가 지속적인 병목
 - PC별 credential 발급/회수가 운영 불가능
 - 사용자별 중앙 인증·감사가 필수
 - 중앙 egress credential 사용이 정식 지원됨
 - Local fleet 장애 분석이 감당하기 어려움
 - 수십~수백 대 규모로 증가
 - SSO, TLS, HA, 운영 인력이 준비됨
-
-중앙 Gateway는 Wrapper V2와 같은 개념이 아니다.
 
 ```text
 Wrapper V1/V2
