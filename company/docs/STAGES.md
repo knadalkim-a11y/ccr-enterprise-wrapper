@@ -24,11 +24,11 @@ Gate는 두 history의 ancestry, upstream-controlled tree의 무변경, origin/u
 최소 증거:
 
 ```text
-Node 22 preflight
+Node LTS >= 22 preflight
 → clean npm ci
 → npm run typecheck
 → npm run build:assets
-→ CLI/Desktop start/stop smoke
+→ CLI start/stop smoke
 ```
 
 Native Termux는 개발 제어환경이며 Windows/native-addon 증거로 사용하지 않는다.
@@ -36,21 +36,67 @@ Native Termux는 개발 제어환경이며 Windows/native-addon 증거로 사용
 
 ### V1-S1 — Internal Provider Contract
 
-CCR이 사내 Windows에서 사내 OpenAI-compatible API를 안정적인 upstream으로 사용할 수 있는가?
+CCR이 사내 Windows에서 사내 OpenAI-compatible API를 upstream Provider로 사용해
+basic completion, streaming, tool result continuation과 주요 availability 오류를 source 수정 없이 처리할 수 있는가?
 
-최소 검증: completion, streaming, tool call/result continuation, 403/429/5xx/timeout 분류.
-GLM 통과 후 Gemma로 확대한다.
+#### Host preconditions
+
+```text
+Provider/gateway contract
+→ WINDOWS_RUNTIME_ALLOWED
++ LLM_CREDENTIAL_AUTHORIZED_FOR_HOST
+
+Claude Code E2E
+→ 위 두 조건
++ CLAUDE_CODE_EXECUTION_ALLOWED
+```
+
+Credential은 특정 PC/source IP/NAT·proxy egress/account/model entitlement에 묶일 수 있다.
+Host scope가 맞지 않아 발생한 401은 `BLOCKED_CREDENTIAL_HOST_SCOPE`이며 protocol failure가 아니다.
+
+#### Model order
+
+모델 검증 순서는 architecture에 고정하지 않고 serving availability를 따른다.
+
+```text
+현재: Gemma first
+이후: GLM serving rollout 완료 시 별도 onboarding
+```
+
+V1-S1 transport Gate는 우선 사용 가능한 내부 모델 한 개로 전체 contract를 증명한다.
+현재는 Gemma가 그 대상이다.
+각 모델은 자신의 V1-S2 workload 전에 Provider와 gateway basic completion을 별도로 통과해야 한다.
+GLM-specific coding loop는 GLM onboarding이 완료될 때까지 시작하지 않는다.
+
+최소 검증:
+
+```text
+Gemma Provider connection
+→ gateway basic completion
+→ streaming
+→ tool call/result continuation
+→ auth/rate-limit/5xx/timeout 또는 network 분류
+```
 
 ### V1-S2 — Claude Code Vertical Slice
 
-사내 Windows에서 검증한다.
+사내 Windows 중 다음 세 capability가 모두 있는 host에서 검증한다.
 
 ```text
-GLM: Read → Edit → Test fail → understand → fix → PASS
-Gemma: Glob/Grep/Search → relevant files → summary
+WINDOWS_RUNTIME_ALLOWED
+LLM_CREDENTIAL_AUTHORIZED_FOR_HOST
+CLAUDE_CODE_EXECUTION_ALLOWED
 ```
 
-Gate는 GLM 최소 loop 증거와 Gemma 권장 범위/제외 사유를 요구한다.
+Model-specific path:
+
+```text
+Gemma: Glob/Grep/Search → relevant files → summary
+GLM: Read → Edit → Test fail → understand → fix → PASS
+```
+
+Gemma path는 Gemma V1-S1 contract 후 진행할 수 있다.
+GLM path는 GLM serving availability와 별도 Provider/gateway onboarding 후 진행한다.
 
 ## Wrapper V1
 
@@ -61,6 +107,7 @@ Gate는 GLM 최소 loop 증거와 Gemma 권장 범위/제외 사유를 요구한
 ### V1-S4 — Repeatable Setup / Doctor
 
 깨끗한 사내 Windows 환경에서 setup과 계층별 진단을 재현할 수 있는가?
+Doctor는 runtime, credential host scope, Claude Code host approval을 서로 다른 계층으로 진단한다.
 
 ### V1-S5 — Safe Pilot
 
