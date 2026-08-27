@@ -55,6 +55,41 @@ GLM: serving rollout 완료 후 별도 onboarding
 
 활성 Task와 실제 상태는 `project-state.yml`과 `STATUS.md`를 따른다.
 
+## 운영 토폴로지와 절감 측정
+
+V1의 기본 운영 목표는 다음이다.
+
+```text
+N명의 사용자
+×
+M대의 승인 Windows PC
+
+Model request data plane
+→ PC별 Managed Local CCR
+
+Fleet analytics plane
+→ privacy-safe 중앙 집계
+```
+
+사용자는 endpoint, protocol, model, key, CCR start/stop을 직접 설정하지 않는다.
+Company installer, launcher, doctor가 PC 단위 설치·설정·업데이트를 담당한다.
+
+중앙 통계 취합은 중앙 CCR Gateway를 의미하지 않는다.
+Local CCR의 장애 격리는 유지하고, prompt/response/source 없이 모델·토큰·fallback·오류 같은 metadata만 모은다.
+
+초기 절감의 1차 KPI는 서로 다른 태스크의 평균 비용이 아니라 다음이다.
+
+```text
+Successful Sonnet avoidance rate
+=
+기존 정책상 Sonnet 대상 중
+Sonnet 호출 없이 resolution chain이 종료된 비율
+```
+
+Sonnet fallback rate와 internal call amplification을 함께 보며,
+비용 환산은 `Sonnet baseline 대비 추정 외부 비용 회피액`이라는 2차 지표로만 표현한다.
+상세 기준은 `company/docs/FLEET_OPERATING_MODEL.md`를 따른다.
+
 ## 새 세션 진입점
 
 1. `AGENTS.md`
@@ -65,6 +100,7 @@ GLM: serving rollout 완료 후 별도 onboarding
 6. `project-state.yml`의 `current.task_path`
 7. 실행환경 검증이 있으면 `company/docs/ENVIRONMENTS.md`
 8. 사내 model/Claude Code 검증이면 `company/docs/SECURITY.md`, `company/docs/INTERNAL_VALIDATION.md`
+9. 설치·Fleet·Telemetry·절감 평가 Task이면 `company/docs/FLEET_OPERATING_MODEL.md`
 
 CCR `v3.0.22` 원본 history와 Company foundation은 이미 하나의 `main` ancestry로 통합되었다.
 

@@ -53,3 +53,39 @@
 - Rationale: 모델 배포 일정 때문에 protocol/transport 검증 전체를 불필요하게 대기시키지 않는다.
 - Consequence: V1-S1 transport Gate는 우선 사용 가능한 모델 한 개로 증명할 수 있다.
 - Consequence: 각 모델의 V1-S2 workload 전에 해당 모델의 Provider와 gateway basic completion을 별도로 통과해야 한다.
+
+## D-009 — V1 기본 배포 토폴로지는 Managed Local Fleet
+
+- Status: ACCEPTED
+- Decision: N명의 사용자가 공유하는 M대 승인 Windows PC마다 논리적 Local CCR Runtime 하나를 두는 방식을 V1 기본 토폴로지로 한다.
+- Rationale: Local 장애 격리, host-scoped credential, 현재 CCR Runtime 구조와 가장 잘 맞으며 중앙 Gateway의 SSO/HA/멀티테넌시 범위를 피한다.
+- Consequence: 사용자는 CCR UI, endpoint, protocol, model, upstream key, start/stop을 직접 다루지 않는다.
+- Consequence: Company installer/launcher/doctor가 PC 단위 설치·설정·업데이트·rollback을 담당한다.
+- Validation: `%APPDATA%` 사용자 범위에서 PC당 Runtime 하나를 만드는 구체 방식은 V1-S3에서 검증한다.
+
+## D-010 — Model data plane과 Fleet analytics plane을 분리
+
+- Status: ACCEPTED
+- Decision: 모델 요청은 각 PC의 Local CCR가 처리하고, 중앙에는 privacy-safe metrics만 취합한다.
+- Rationale: 전체 사용자에게 영향을 주는 중앙 Gateway 장애와 운영 범위를 추가하지 않고도 Fleet 가시성을 확보할 수 있다.
+- Consequence: 중앙 Collector는 prompt, response, source, raw tool data, 실제 endpoint/key/model ID를 수집하지 않는다.
+- Consequence: 초기에는 approved shared path의 daily JSON/CSV batch를 허용하고, 실시간 Collector는 Pilot에서 필요성이 증명될 때만 만든다.
+- Clarification: 중앙 analytics는 중앙 CCR Gateway를 의미하지 않는다.
+
+## D-011 — V1 절감의 1차 KPI는 Successful Sonnet avoidance
+
+- Status: ACCEPTED
+- Decision: 서로 다른 태스크의 평균 비용보다, 기존 정책상 Sonnet 대상이었던 resolution chain 중 Sonnet 호출 없이 종료된 비율을 V1 핵심 KPI로 사용한다.
+- Rationale: 태스크 난이도와 길이가 달라도 각 routing opportunity의 baseline decision과 actual route는 일관되게 집계할 수 있다.
+- Guardrails: Internal-first rate, Sonnet fallback rate, Internal call amplification, token-weighted avoidance, success/error/latency를 함께 본다.
+- Consequence: 사내 모델 호출 횟수만으로 절감을 주장하지 않는다. 내부 모델 시도 후 Sonnet fallback은 successful avoidance가 아니다.
+- Consequence: 동일 작업을 Sonnet으로 중복 실행하지 않고 versioned baseline policy를 metadata로 기록한다.
+
+## D-012 — 비용 환산과 task-level 평가는 단계적으로 확장
+
+- Status: ACCEPTED
+- Decision: `Sonnet baseline 대비 추정 외부 비용 회피액`을 2차 지표로 사용하며 `확정 절감액`이라고 표현하지 않는다.
+- Rationale: 실제 Sonnet 호출 시 출력 길이, 재시도, 성공률이 달라질 수 있어 counterfactual 비용은 추정치다.
+- V1: routing opportunity/resolution chain 수준의 Sonnet avoidance를 측정한다.
+- V2: session/test/result correlation 후 task-level success와 Cost per Successful Task를 추가한다.
+- Consequence: Cost per Successful Task는 V1 필수 Gate가 아니다.
