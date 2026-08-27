@@ -14,3 +14,9 @@
 - Host/source scope mismatch의 401/403은 `BLOCKED_CREDENTIAL_HOST_SCOPE`이며 protocol/model/CCR failure로 기록하지 않는다.
 - 실제 host/IP, endpoint, key, model ID, raw internal evidence를 repository에 기록하지 않는다.
 - Key 공유, allowlist 우회, 승인되지 않은 proxy/tunnel/relay를 사용하지 않는다.
+- 설치·Fleet·Telemetry·절감 평가 Task는 `company/docs/FLEET_OPERATING_MODEL.md`를 Required knowledge로 포함한다.
+- Managed Local Fleet의 중앙 집계는 metadata-only이며 prompt, response, source, file path, raw tool data, raw DB/log를 전송하지 않는다.
+- 중앙 analytics를 이유로 중앙 CCR Gateway, SSO, HA, Control Plane을 미리 구현하지 않는다.
+- V1 절감 주장은 `baseline policy version`, `baseline model class`, `actual model`, `fallback`을 함께 기록해야 한다.
+- 사내 모델 호출 수만으로 절감을 주장하지 않으며, Sonnet fallback이 발생한 chain은 Successful Sonnet avoidance로 세지 않는다.
+- `Cost per Successful Task`와 task-level success는 session/test/result correlation이 있는 V2 전에는 V1 필수 Gate로 만들지 않는다.
