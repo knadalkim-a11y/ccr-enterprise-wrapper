@@ -9,3 +9,8 @@
 - 사내 검증은 product code 수정 없이 실행 가능해야 한다.
 - Trap은 재현 또는 코드 근거, 회피법, 적용 버전, Task/commit 증거가 있을 때만 등록한다.
 - Task 파일이 Issue/PR보다 우선하는 유일한 요구사항 Source of Truth다.
+- 모델 순서는 serving availability를 따르며 과거의 GLM-first/Gemma-first 가정을 자동 적용하지 않는다.
+- 사내 model request 전에 `WINDOWS_RUNTIME_ALLOWED`, `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST`, 필요 시 `CLAUDE_CODE_EXECUTION_ALLOWED`를 확인한다.
+- Host/source scope mismatch의 401/403은 `BLOCKED_CREDENTIAL_HOST_SCOPE`이며 protocol/model/CCR failure로 기록하지 않는다.
+- 실제 host/IP, endpoint, key, model ID, raw internal evidence를 repository에 기록하지 않는다.
+- Key 공유, allowlist 우회, 승인되지 않은 proxy/tunnel/relay를 사용하지 않는다.
