@@ -57,6 +57,37 @@ BLOCKED_CREDENTIAL_HOST_SCOPE
 Provider-only 검증과 Claude Code E2E는 서로 다른 PC에서 수행할 수 있다.
 다만 E2E까지 같은 설정을 재사용하려면 세 권한이 모두 있는 host를 우선 선택한다.
 
+## Accepted future operating design
+
+현재 Task와 무관하게 향후 V1 운영 방향은 다음으로 결정됐다.
+
+```text
+N명의 사용자
+×
+M대의 승인 Windows PC
+
+Model request data plane
+→ PC별 Managed Local CCR
+
+Fleet analytics plane
+→ privacy-safe 중앙 집계
+```
+
+사용자는 CCR UI, endpoint, protocol, model, upstream key, start/stop을 직접 다루지 않는다.
+Company installer/launcher/doctor가 PC 단위 설치·설정·업데이트를 담당한다.
+
+V1 절감의 1차 KPI:
+
+```text
+Successful Sonnet avoidance rate
+=
+기존 정책상 Sonnet 대상 중
+Sonnet 호출 없이 resolution chain이 종료된 비율
+```
+
+`Sonnet baseline 대비 추정 외부 비용 회피액`은 2차 지표이며 확정 절감액으로 표현하지 않는다.
+상세 설계는 `company/docs/FLEET_OPERATING_MODEL.md`를 따른다.
+
 ## Confirmed facts
 
 | Item | Status | Evidence |
@@ -70,6 +101,10 @@ Provider-only 검증과 Claude Code E2E는 서로 다른 PC에서 수행할 수 
 | Credential/host scope model | CONFIRMED | credential validity depends on approved execution host/source scope |
 | Gemma Provider connection check | BLOCKED_CREDENTIAL_HOST_SCOPE | selected validation host에서 credential scope mismatch로 `401`; protocol check 미완료 |
 | GLM serving availability | DEFERRED | serving rollout 대기; 현재 active model order는 Gemma first |
+| Managed Local Fleet topology | DESIGN_ACCEPTED | PC별 Local CCR data plane, 중앙 analytics plane 분리 |
+| Non-developer setup target | DESIGN_ACCEPTED | installer/launcher/doctor가 사용자 수동 CCR 설정을 제거 |
+| Fleet telemetry boundary | DESIGN_ACCEPTED | metadata allowlist; prompt/response/source/raw DB 중앙 수집 금지 |
+| Savings primary KPI | DESIGN_ACCEPTED | Successful Sonnet avoidance + fallback/amplification guardrail |
 | Gateway basic completion | UNVERIFIED | Gemma Provider check 이후 별도 Task |
 | Streaming/tool contract | UNVERIFIED | later V1-S1 Tasks |
 | Claude Code E2E | UNVERIFIED | Claude Code 승인 host + host-authorized credential 필요 |
@@ -94,6 +129,10 @@ Provider-only 검증과 Claude Code E2E는 서로 다른 PC에서 수행할 수 
 - 실제 source identity는 local IP가 아니라 NAT/proxy egress일 수 있으므로 serving 운영자 기준 확인이 필요하다.
 - GLM rollout은 아직 완료되지 않았다. GLM-specific task는 service availability가 확인된 뒤 새로 생성한다.
 - Gemma Provider `Check Connection` output may include internal diagnostics; only sanitized categories may be returned externally.
+- Stock CCR `%APPDATA%`가 사용자 프로필 범위이므로 multi-user Windows에서 PC당 Runtime 하나를 만드는 방식은 V1-S3에서 검증해야 한다.
+- CCR의 공식 metadata export/event interface와 Company exporter 구현 경로는 아직 검증되지 않았다.
+- Pilot 전 baseline policy version과 resolution-chain 성공 판정을 고정해야 한다.
+- 사용자별 감사가 필수인지 PC 단위 통계로 충분한지 운영 요구가 아직 확정되지 않았다.
 
 ## Last passed gate
 
