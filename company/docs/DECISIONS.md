@@ -118,3 +118,16 @@
 - Rationale: 하나의 검증된 upstream protocol로 Provider/gateway/stream/tool contract를 진행할 수 있고 Claude Code 연동에 Responses가 필수라는 증거가 없다.
 - Boundary: 이 결정은 현재 Gemma Provider에 한정하며 GLM이나 다른 Provider의 protocol을 영구 제한하지 않는다.
 - UX: 부분 protocol 성공을 더 명확히 보여주는 개선은 후보지만 현재 Core patch를 만들지 않는다.
+
+## D-016 — 작업은 Task-driven Four-Lane workflow로 운영
+
+- Status: ACCEPTED
+- Decision: 모든 작업을 `DESIGN → BUILD → VALIDATE → GATE` 네 Lane으로 분리하고, Task 파일 하나에는 검증 질문과 실패 계층 하나만 둔다.
+- Design: ChatGPT Orchestrator와 Human Gate Owner가 Task, actor, execution mode, candidate/merge contract를 작성한다.
+- Build: 코드 변경이 필요할 때만 External Codex가 branch/PR을 만들며, 내부 검증 지침을 candidate에 포함한다.
+- Validate: Internal Validator는 승인된 Task와 exact instruction/candidate SHA 하나만 pull/checkout해 test-only 검증하고 종료한다.
+- Human-assisted: 실제 credential/UI/승인은 Human Step으로 표시하고 Internal Validator는 해당 Step에서 멈췄다가 최소 완료 상태만 받아 재개한다.
+- Gate: Human Gate Owner가 PASS/RETRY/BLOCKED/DEFER와 다음 Task를 최종 승인하고 ChatGPT Orchestrator가 canonical 상태를 반영한다.
+- Candidate: 구현 Task는 `instruction_sha == candidate_sha == PR head SHA`를 기본으로 한다. Validation-only 예외는 두 SHA와 product tree equivalence를 기록한다.
+- Merge: `internal_validation: required` 코드 PR은 exact PR head의 `INTERNAL_PASS` 전 병합하지 않는다.
+- Rationale: 사외 개발과 사내 비밀 환경 검증을 분리하면서도, 어떤 코드와 어떤 지침이 검증됐는지 재현 가능하게 유지한다.
