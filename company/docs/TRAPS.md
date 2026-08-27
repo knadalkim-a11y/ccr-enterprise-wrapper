@@ -53,11 +53,29 @@ Git·문서·에이전트 제어는 native Termux에서 계속 수행하고, nat
 - Classification: `BLOCKED_CREDENTIAL_HOST_SCOPE`
 - Do not classify as: `PROTOCOL_COMPATIBILITY`, generic `AUTHORIZATION`, CCR source defect, model defect
 - Recovery: 승인된 host/credential 조합으로 같은 Task만 재실행함. Key 공유, proxy/tunnel, allowlist 우회는 사용하지 않음
-- Evidence: `V1-S1-T01` Attempt 1, Issue #15; selected validation host에서 401이 발생했고 credential은 다른 host/source scope에 한정됨
+- Evidence: `V1-S1-T01` Attempt 1, Issue #15
 - Recheck when: credential 발급 또는 allowlist 정책이 변경되거나 host-independent credential이 제공됨
 
 Provider-only Task는 credential-authorized Windows host에서 수행할 수 있다.
 Claude Code E2E는 추가로 `CLAUDE_CODE_EXECUTION_ALLOWED`가 있는 host에서 수행해야 한다.
+
+## TRAP-004 — 일부 protocol 실패를 Provider 전체 실패로 해석하지 말 것
+
+- Status: `ACTIVE`
+- Scope: Custom OpenAI-compatible Provider protocol detection and connectivity
+- Applies to: CCR `v3.0.22`, current internal Gemma Provider
+- Symptom: 동일 endpoint/key/model에서 `openai_chat_completions`는 PASS하지만 `openai_responses`는 HTTP `500`으로 실패함
+- Code behavior: CCR probe는 protocol별로 별도 endpoint/body를 전송하며 하나 이상의 protocol이 supported이면 Provider connectivity를 usable로 판정함
+- Root cause: `UNKNOWN` — 사내 Gateway의 `/v1/responses` 미지원/비호환 또는 CCR Responses contract와의 비호환 가능성
+- Avoid: 현재 Gemma V1 운영 config는 Auto detect OFF, manual `openai_chat_completions` only로 저장함
+- Detect: protocol detail에서 Chat PASS와 Responses FAIL이 분리되어 나타남
+- Classification: Responses는 `UNSUPPORTED_OR_INCOMPATIBLE`; 현재 Gemma V1에서 non-blocking
+- Do not classify as: Provider 전체 실패, credential failure, Gemma model failure, 특정 replica failure 확정
+- Recovery: 검증된 Chat protocol로 진행하고 Responses는 공식 지원 여부 또는 별도 compatibility Task에서 확인함
+- Evidence: `V1-S1-T01` Attempt 2; direct Chat PASS, CCR Chat PASS, CCR Responses HTTP 500; `packages/core/src/providers/probe.ts`
+- Recheck when: 사내 Gateway가 `/v1/responses` 공식 지원을 선언하거나 CCR/Gateway version이 변경됨
+
+부분 성공 UX가 혼동을 일으킬 수 있지만 현재 V1에서는 Core patch보다 Company-managed Chat-only config를 우선한다.
 
 ## Template
 
