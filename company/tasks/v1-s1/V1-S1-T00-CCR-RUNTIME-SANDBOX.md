@@ -37,10 +37,12 @@ human_decision: pending
 
 ## Validation question
 
-> Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행하고 활성 Claude Code global/System-default profile을 제거해도, 기존 Enterprise Claude Code 설정·인증·모델과 실제 `%LOCALAPPDATA%\Claude-3p`가 전혀 변경되지 않는가?
+> Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행하고 활성 Claude Code global/System-default profile을 제거해도, 기존 Enterprise Claude Code 설정·인증·모델과 실제 Claude Desktop의 CCR-managed 설정 surface가 변경되지 않는가?
 
-이 Task는 격리 선행조건 하나만 검증한다.
+이 Task는 **CCR management/config-save Runtime 격리** 하나만 검증한다.
 Provider 연결 재검사, model request, `Connect agent`, Streaming, Tool, CCR Claude Code 실행은 하지 않는다.
+
+`company-claude` 자식 프로세스가 원래 `LOCALAPPDATA`를 유지하는지는 V1-S2의 별도 launcher Task에서 검증한다.
 
 ## Why this Task exists
 
@@ -65,6 +67,7 @@ Source review도 다음을 확인했다.
 - `Only opened from CCR`는 Claude Code에 별도 settings와 `CLAUDE_CONFIG_DIR`을 사용한다.
 - management start/config save는 Claude App Gateway sync를 호출할 수 있다.
 - Windows Claude App sync 기본 경로는 `%LOCALAPPDATA%\Claude-3p`다.
+- 확인된 write surface는 root config, config-library metadata와 CCR config entry다.
 
 따라서 Provider Task를 재개하기 전에 management/runtime side effect를 Enterprise 영역에서 격리할 수 있는지 증명해야 한다.
 
@@ -107,12 +110,25 @@ Mode:
 
 ```text
 %USERPROFILE%\.claude\settings.json
-실제 %LOCALAPPDATA%\Claude-3p
+실제 %LOCALAPPDATA%\Claude-3p의 CCR-managed config files
 일반 claude command resolution
-Windows User/Machine CCR-managed environment values
+Windows Process/User/Machine CCR-managed environment boundary
 Enterprise Claude Code authentication/model visibility
 일반 Claude Desktop 동작
 ```
+
+### Known Claude-3p write surface
+
+CCR `v3.0.22` 소스상 자동 fingerprint 대상은 다음 세 파일이다.
+
+```text
+%LOCALAPPDATA%\Claude-3p\claude_desktop_config.json
+%LOCALAPPDATA%\Claude-3p\configLibrary\_meta.json
+%LOCALAPPDATA%\Claude-3p\configLibrary\8f69f2f1-3275-4ad8-9317-4aa7e972f311.json
+```
+
+`Claude-3p` 전체 tree hash는 캐시·업데이트 파일로 인한 오탐 가능성이 있어 Gate에 사용하지 않는다.
+마지막 일반 Claude Desktop smoke가 전체 사용자 관점의 정상성을 보완한다.
 
 ### Allowed to change
 
@@ -169,7 +185,7 @@ A0 repository/service preflight
 → A4 sanitized report
 ```
 
-H0보다 먼저 fingerprint를 잡지 않는다.
+H0보다 먼저 authoritative fingerprint를 잡지 않는다.
 
 ## A0 — [INTERNAL_VALIDATOR] Repository and service preflight
 
@@ -241,6 +257,28 @@ Claude clients closed: YES / NO
 $EnterpriseSettings = Join-Path $env:USERPROFILE ".claude\settings.json"
 $RealClaude3p = Join-Path $env:LOCALAPPDATA "Claude-3p"
 $SandboxLocalAppData = Join-Path $env:APPDATA "CompanyCCR\runtime-localappdata"
+$SandboxClaude3p = Join-Path $SandboxLocalAppData "Claude-3p"
+$ClaudeAppConfigId = "8f69f2f1-3275-4ad8-9317-4aa7e972f311"
+
+function New-Claude3pTargets([string]$Root) {
+  @(
+    [PSCustomObject]@{
+      Name = "root-config"
+      Path = Join-Path $Root "claude_desktop_config.json"
+    },
+    [PSCustomObject]@{
+      Name = "library-meta"
+      Path = Join-Path $Root "configLibrary\_meta.json"
+    },
+    [PSCustomObject]@{
+      Name = "ccr-library-entry"
+      Path = Join-Path $Root "configLibrary\$ClaudeAppConfigId.json"
+    }
+  )
+}
+
+$RealClaude3pTargets = New-Claude3pTargets $RealClaude3p
+$SandboxClaude3pTargets = New-Claude3pTargets $SandboxClaude3p
 
 $ManagedEnvKeys = @(
   "CLAUDE_CONFIG_DIR",
@@ -267,21 +305,14 @@ $ManagedEnvKeys = @(
   "CODEXL_CLAUDE_CODE_MCP_CONFIG"
 )
 
-function Get-FileFingerprint([string]$Path) {
-  if (-not (Test-Path $Path)) { return "ABSENT" }
-  return (Get-FileHash -Algorithm SHA256 -Path $Path).Hash
-}
+$ProcessBoundaryKeys = @(
+  "LOCALAPPDATA",
+  "APPDATA",
+  "USERPROFILE"
+) + $ManagedEnvKeys
 
-function Get-TreeFingerprint([string]$Path) {
-  if (-not (Test-Path $Path)) { return "ABSENT" }
-  $Rows = Get-ChildItem -Path $Path -Recurse -File -ErrorAction Stop |
-    Sort-Object FullName |
-    ForEach-Object {
-      $Relative = $_.FullName.Substring($Path.Length).TrimStart("\")
-      $Hash = (Get-FileHash -Algorithm SHA256 -Path $_.FullName).Hash
-      "$Relative|$Hash"
-    }
-  $Bytes = [System.Text.Encoding]::UTF8.GetBytes(($Rows -join "`n"))
+function Get-StringFingerprint([string]$Value) {
+  $Bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
   $Sha = [System.Security.Cryptography.SHA256]::Create()
   try {
     return ([BitConverter]::ToString($Sha.ComputeHash($Bytes))).Replace("-", "")
@@ -290,18 +321,27 @@ function Get-TreeFingerprint([string]$Path) {
   }
 }
 
-function Get-EnvFingerprint([string]$Scope) {
-  $Rows = foreach ($Name in $ManagedEnvKeys) {
+function Get-FileFingerprint([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    return "ABSENT"
+  }
+  return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash
+}
+
+function Get-PathSetFingerprint($Targets) {
+  $Rows = foreach ($Target in $Targets) {
+    $Fingerprint = Get-FileFingerprint $Target.Path
+    "$($Target.Name)|$Fingerprint"
+  }
+  return Get-StringFingerprint ($Rows -join "`n")
+}
+
+function Get-EnvFingerprint([string]$Scope, [string[]]$Keys) {
+  $Rows = foreach ($Name in $Keys) {
     $Value = [Environment]::GetEnvironmentVariable($Name, $Scope)
     "$Name=$Value"
   }
-  $Bytes = [System.Text.Encoding]::UTF8.GetBytes(($Rows -join "`n"))
-  $Sha = [System.Security.Cryptography.SHA256]::Create()
-  try {
-    return ([BitConverter]::ToString($Sha.ComputeHash($Bytes))).Replace("-", "")
-  } finally {
-    $Sha.Dispose()
-  }
+  return Get-StringFingerprint ($Rows -join "`n")
 }
 
 function Get-ClaudeResolutionFingerprint {
@@ -310,21 +350,16 @@ function Get-ClaudeResolutionFingerprint {
     (Get-Command claude -All -ErrorAction SilentlyContinue |
       ForEach-Object { "$($_.CommandType)|$($_.Source)|$($_.Path)" })
   )
-  $Bytes = [System.Text.Encoding]::UTF8.GetBytes(($Rows -join "`n"))
-  $Sha = [System.Security.Cryptography.SHA256]::Create()
-  try {
-    return ([BitConverter]::ToString($Sha.ComputeHash($Bytes))).Replace("-", "")
-  } finally {
-    $Sha.Dispose()
-  }
+  return Get-StringFingerprint ($Rows -join "`n")
 }
 
 $Baseline = [PSCustomObject]@{
   EnterpriseSettings = Get-FileFingerprint $EnterpriseSettings
-  RealClaude3p       = Get-TreeFingerprint $RealClaude3p
-  UserEnv            = Get-EnvFingerprint "User"
-  MachineEnv         = Get-EnvFingerprint "Machine"
-  ClaudeResolution   = Get-ClaudeResolutionFingerprint
+  RealClaude3pConfig = Get-PathSetFingerprint $RealClaude3pTargets
+  ProcessEnv = Get-EnvFingerprint "Process" $ProcessBoundaryKeys
+  UserEnv = Get-EnvFingerprint "User" $ManagedEnvKeys
+  MachineEnv = Get-EnvFingerprint "Machine" $ManagedEnvKeys
+  ClaudeResolution = Get-ClaudeResolutionFingerprint
 }
 ```
 
@@ -348,9 +383,13 @@ try {
   $env:LOCALAPPDATA = $OriginalLocalAppData
 }
 
-$StartExit
 $ParentLocalAppDataRestored = $env:LOCALAPPDATA -eq $OriginalLocalAppData
+$ParentProcessEnvAfterStart = Get-EnvFingerprint "Process" $ProcessBoundaryKeys
+$ParentProcessEnvRestored = $Baseline.ProcessEnv -eq $ParentProcessEnvAfterStart
+
+$StartExit
 $ParentLocalAppDataRestored
+$ParentProcessEnvRestored
 ```
 
 기대 결과:
@@ -358,6 +397,7 @@ $ParentLocalAppDataRestored
 ```text
 StartExit = 0
 ParentLocalAppDataRestored = True
+ParentProcessEnvRestored = True
 ```
 
 Management URL/token은 사내 PC 안에서만 사용한다.
@@ -374,6 +414,9 @@ Management URL/token은 사내 PC 안에서만 사용한다.
 5. Provider endpoint/key/model/protocol은 수정하지 않는다.
 6. 설정을 저장한다.
 7. `Connect agent`, `Let's start`, model request를 수행하지 않는다.
+
+설정 저장 과정에서 Gateway가 내부적으로 시작되더라도 model request를 보내지 않는다.
+모든 side effect는 sandbox process 안에 머물러야 한다.
 
 Internal Validator에 반환:
 
@@ -397,21 +440,29 @@ Claude Code와 Claude Desktop은 이 비교가 끝날 때까지 실행하지 않
 function Get-CurrentInvariantState {
   [PSCustomObject]@{
     EnterpriseSettings = Get-FileFingerprint $EnterpriseSettings
-    RealClaude3p       = Get-TreeFingerprint $RealClaude3p
-    UserEnv            = Get-EnvFingerprint "User"
-    MachineEnv         = Get-EnvFingerprint "Machine"
-    ClaudeResolution   = Get-ClaudeResolutionFingerprint
+    RealClaude3pConfig = Get-PathSetFingerprint $RealClaude3pTargets
+    ProcessEnv = Get-EnvFingerprint "Process" $ProcessBoundaryKeys
+    UserEnv = Get-EnvFingerprint "User" $ManagedEnvKeys
+    MachineEnv = Get-EnvFingerprint "Machine" $ManagedEnvKeys
+    ClaudeResolution = Get-ClaudeResolutionFingerprint
   }
 }
 
 $During = Get-CurrentInvariantState
 
 $SettingsDuringSame = $Baseline.EnterpriseSettings -eq $During.EnterpriseSettings
-$Claude3pDuringSame = $Baseline.RealClaude3p -eq $During.RealClaude3p
+$Claude3pDuringSame = $Baseline.RealClaude3pConfig -eq $During.RealClaude3pConfig
+$ProcessEnvDuringSame = $Baseline.ProcessEnv -eq $During.ProcessEnv
 $UserEnvDuringSame = $Baseline.UserEnv -eq $During.UserEnv
 $MachineEnvDuringSame = $Baseline.MachineEnv -eq $During.MachineEnv
 $ClaudeResolutionDuringSame = $Baseline.ClaudeResolution -eq $During.ClaudeResolution
-$SandboxClaude3pExists = Test-Path (Join-Path $SandboxLocalAppData "Claude-3p")
+
+$SandboxClaude3pTargetCount = @(
+  $SandboxClaude3pTargets |
+    Where-Object { Test-Path -LiteralPath $_.Path -PathType Leaf }
+).Count
+$SandboxClaude3pConfigMaterialized =
+  $SandboxClaude3pTargetCount -eq $SandboxClaude3pTargets.Count
 
 node $Cli stop
 $StopExit = $LASTEXITCODE
@@ -419,7 +470,8 @@ $StopExit = $LASTEXITCODE
 $After = Get-CurrentInvariantState
 
 $SettingsAfterSame = $Baseline.EnterpriseSettings -eq $After.EnterpriseSettings
-$Claude3pAfterSame = $Baseline.RealClaude3p -eq $After.RealClaude3p
+$Claude3pAfterSame = $Baseline.RealClaude3pConfig -eq $After.RealClaude3pConfig
+$ProcessEnvAfterSame = $Baseline.ProcessEnv -eq $After.ProcessEnv
 $UserEnvAfterSame = $Baseline.UserEnv -eq $After.UserEnv
 $MachineEnvAfterSame = $Baseline.MachineEnv -eq $After.MachineEnv
 $ClaudeResolutionAfterSame = $Baseline.ClaudeResolution -eq $After.ClaudeResolution
@@ -433,17 +485,18 @@ git status --short
 
 ```text
 Enterprise settings during/after = SAME
-actual Claude-3p during/after = SAME
+actual Claude-3p CCR config surface during/after = SAME
+Process env during/after = SAME
 User env during/after = SAME
 Machine env during/after = SAME
 normal claude resolution during/after = SAME
-sandbox Claude-3p exists = TRUE
+sandbox Claude-3p config materialized = TRUE
 StopExit = 0
 ProductDiffExit = 0
 final git status = clean
 ```
 
-Boolean/equality만 보고하고 fingerprint 값은 출력하지 않는다.
+Boolean/equality와 target count만 보고하고 fingerprint 값·파일 원문·전체 경로는 출력하지 않는다.
 
 ## H2 — [HUMAN_GATE_OWNER] Enterprise after smoke
 
@@ -469,16 +522,18 @@ Manual settings/env recovery required: NO
 - [ ] baseline captured after smoke and shutdown
 - [ ] service starts with process-local sandbox `LOCALAPPDATA`
 - [ ] parent PowerShell `LOCALAPPDATA` restored immediately
+- [ ] parent Process env boundary restored immediately
 - [ ] enabled global Claude Code profiles after save = `0`
 - [ ] Request logs OFF
 - [ ] Agent observability OFF
 - [ ] Provider unchanged
 - [ ] actual Enterprise settings during/after = SAME
-- [ ] actual Claude-3p during/after = SAME
+- [ ] actual Claude-3p CCR config surface during/after = SAME
+- [ ] Process env during/after = SAME
 - [ ] User env during/after = SAME
 - [ ] Machine env during/after = SAME
 - [ ] normal `claude` resolution during/after = SAME
-- [ ] sandbox Claude-3p exists
+- [ ] sandbox Claude-3p config files materialized
 - [ ] stop exit `0`
 - [ ] Enterprise after smoke PASS
 - [ ] manual rollback not required
@@ -492,11 +547,12 @@ Manual settings/env recovery required: NO
 
 ```text
 PASS
-→ runtime sandbox proves Enterprise invariance
+→ management/config-save runtime sandbox proves Enterprise invariance
 → Human Gate may reactivate V1-S1-T01
+→ company-claude child isolation is still UNVERIFIED until V1-S2
 
 FAIL — ISOLATION_BREACH
-→ Enterprise settings/env/Claude-3p/command changed
+→ Enterprise settings/env/Claude-3p config/command changed
 → Human restores local baseline
 → External Codex repair or explicit sync-disable Task required
 
@@ -529,6 +585,7 @@ BLOCKED
 - `ISOLATION_BREACH`
 - `GLOBAL_PROFILE_PERSISTENCE`
 - `CLAUDE_APP_CONFIG_PERSISTENCE`
+- `PROCESS_ENVIRONMENT_LEAK`
 - `LOGGING_SAFETY`
 - `SHUTDOWN`
 - `PRODUCT_DIFF`
@@ -559,11 +616,13 @@ H0:
 
 A1:
 - baseline captured after smoke/shutdown:
+- fingerprint scope: TARGETED_CCR_CONFIG_FILES
 
 A2:
 - sandbox service start:
 - start exit code:
 - parent LOCALAPPDATA restored:
+- parent Process env restored:
 
 H1:
 - enabled global Claude Code profiles:
@@ -576,16 +635,19 @@ H1:
 
 A3 during:
 - Enterprise settings: SAME / CHANGED
-- actual Claude-3p: SAME / CHANGED
+- actual Claude-3p CCR config surface: SAME / CHANGED
+- Process env: SAME / CHANGED
 - User env: SAME / CHANGED
 - Machine env: SAME / CHANGED
 - normal claude resolution: SAME / CHANGED
-- sandbox Claude-3p exists:
+- sandbox Claude-3p config materialized: YES / NO
+- sandbox target count: 0..3
 
 A3 after:
 - CCR stop / exit code:
 - Enterprise settings: SAME / CHANGED
-- actual Claude-3p: SAME / CHANGED
+- actual Claude-3p CCR config surface: SAME / CHANGED
+- Process env: SAME / CHANGED
 - User env: SAME / CHANGED
 - Machine env: SAME / CHANGED
 - normal claude resolution: SAME / CHANGED
@@ -597,6 +659,10 @@ H2:
 - Enterprise models after:
 - Claude Desktop after:
 - manual rollback required: NO / YES
+
+Coverage boundary:
+- management/config-save isolation: TESTED
+- company-claude child environment: NOT_TESTED
 
 Failure classification:
 Reproducibility:
@@ -610,7 +676,7 @@ Next Task started: NO
 
 | Attempt | Actor / session role | Candidate | Internal result | Recommendation |
 |---:|---|---|---|---|
-| 1 | Internal runtime isolation | `97b73a9f...` | `PENDING` | process-local sandbox 검증 |
+| 1 | Internal runtime isolation | `97b73a9f...` | `PENDING` | targeted config-surface sandbox 검증 |
 
 ## Human decision
 
