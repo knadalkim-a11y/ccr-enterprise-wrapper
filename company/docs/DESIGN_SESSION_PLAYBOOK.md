@@ -6,7 +6,7 @@
 이 저장소의 canonical 문서만 읽고도 현재 상태, 승인 결정, 미해결 질문,
 활성 Task와 정확한 다음 행동을 복원할 수 있어야 한다.
 
-현재 상태는 `project-state.yml`, `STATUS.md`, 활성 Task에만 기록한다.
+현재 상태는 `project-state.yml`, `STATUS.md`, 활성 Task에 기록한다.
 이 문서는 새 세션의 복원·Task 설계·handoff 절차를 정의한다.
 
 ## 새 설계 세션 역할
@@ -29,6 +29,7 @@ Role: CHATGPT_ORCHESTRATOR
 | 현재 Task 범위·actor·evidence | `current.task_path` |
 | Task 작성 규칙 | `company/tasks/README.md`, `TASK_TEMPLATE.md` |
 | 역할과 GitHub 권한 | `company/docs/ROLES_AND_HANDOFF.md` |
+| Claude Enterprise/CCR 실행 경계 | `company/docs/CLAUDE_CODE_ISOLATION.md` |
 | 반복 함정 | `company/docs/TRAPS.md` |
 | 사내 검증 규칙 | `company/docs/INTERNAL_VALIDATION.md` |
 | 비밀·Telemetry 경계 | `company/docs/SECURITY.md` |
@@ -49,7 +50,8 @@ Issue와 PR은 전달·리뷰 수단이며 canonical 문서보다 우선하지 �
 8. `company/docs/AGENT_WORKFLOW.md`
 9. `current.task_path`
 10. 활성 Task의 Required knowledge
-11. 관련이 있을 때만 `TRAPS`, `SECURITY`, `INTERNAL_VALIDATION`, `FLEET_OPERATING_MODEL`
+11. Claude/CCR Task이면 `CLAUDE_CODE_ISOLATION.md`
+12. 관련이 있을 때만 `TRAPS`, `SECURITY`, `INTERNAL_VALIDATION`, `FLEET_OPERATING_MODEL`
 
 모든 문서를 매번 전부 읽지 않는다.
 현재 질문과 Task에 필요한 canonical 문서만 추가로 읽는다.
@@ -67,6 +69,8 @@ Current status/blocker:
 Last passed Gate:
 Validated product commit:
 Active model/protocol decision:
+Claude execution contract: claude / company-claude
+Enterprise isolation status:
 Open risks relevant to current Task:
 Exact next action:
 Role boundaries for this action:
@@ -97,7 +101,7 @@ PROPOSAL / OPEN QUESTION
 
 > 독립적으로 PASS / FAIL / BLOCKED를 판단할 수 있는가?
 
-Provider, Profile, Completion, Streaming, Tool, E2E처럼 실패 계층이 다르면 Task를 나눈다.
+Runtime isolation, Provider, Profile, Completion, Streaming, Tool, E2E처럼 실패 계층이 다르면 Task를 나눈다.
 
 ### 2. 구현이 필요한가
 
@@ -143,6 +147,49 @@ Yes
 - 사내 exact candidate 검증: `INTERNAL_VALIDATOR`
 - 정책/secret/UI/Gate: `HUMAN_GATE_OWNER`
 
+## Claude isolation Task 설계
+
+Claude 관련 Task는 먼저 실행 lane을 명시한다.
+
+```text
+claude
+→ Enterprise lane
+
+company-claude
+→ CCR lane
+```
+
+V1 기본:
+
+```text
+Only opened from CCR
+scope=ccr
+CLI only
+System default prohibited
+Claude App deferred
+```
+
+또한 다음을 별도 검증한다.
+
+```text
+Client profile isolation
+≠
+CCR Runtime side-effect isolation
+```
+
+Stock management/save가 real `%LOCALAPPDATA%\Claude-3p`를 변경할 수 있으므로, 승인된 sandbox `LOCALAPPDATA` 없이 Provider/Profile Task를 실행하지 않는다.
+
+Baseline fingerprint는 반드시:
+
+```text
+Enterprise smoke
+→ 모든 Claude client 종료
+→ capture
+```
+
+순서로 잡는다.
+수동 rollback이 필요하면 PASS가 아니라 `ISOLATION_BREACH`다.
+
 ## Task 파일 작성 원칙
 
 - Task 하나당 파일 하나를 만든다.
@@ -152,6 +199,7 @@ Yes
 - `candidate_sha`, `instruction_sha`, merge policy를 명시한다.
 - Internal Validator가 Task를 자율 선택하지 않게 exact handoff를 작성한다.
 - Sanitized Evidence 템플릿과 Stop condition을 포함한다.
+- Claude Task에는 invariant/allowed paths와 fail-closed 조건을 포함한다.
 
 ## Candidate 설계
 
@@ -178,38 +226,25 @@ product tree equivalence: 기록
 
 ## Human-assisted Task 설계
 
-예:
-
 ```text
 A1 [INTERNAL_VALIDATOR]
 - preflight
-- CCR start
-- Human Step 준비 완료 보고
+- Human Step 준비
 
 H1 [HUMAN_GATE_OWNER]
-- 실제 key 입력
-- UI 선택/승인
+- 실제 key/UI/승인
 - secret 없이 완료 상태 반환
 
 A2 [INTERNAL_VALIDATOR]
 - 결과 확인
 - service stop
-- product diff
+- invariant/product diff
 - sanitized evidence
 ```
 
-Human Step에는 다음을 명시한다.
-
-```text
-사람이 할 일
-agent output에 넣지 않을 실제 값
-agent에 반환할 최소 상태
-실패/중단 조건
-```
+Human Step에는 사람이 할 일, agent output 금지 값, 최소 반환 상태, 실패/중단 조건을 명시한다.
 
 ## Internal handoff 작성
-
-사내 프롬프트는 GitHub Task를 가리키는 짧은 bootstrap이어야 한다.
 
 ```text
 Role: INTERNAL_VALIDATOR
@@ -228,14 +263,15 @@ Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 
 ## Internal evidence를 받았을 때
 
-1. 역할, Task ID, candidate/instruction SHA가 있는지 확인한다.
+1. 역할, Task ID, candidate/instruction SHA를 확인한다.
 2. Task Acceptance Criteria와 모순되는지 검토한다.
-3. PASS/FAIL/BLOCKED를 환경·권한·protocol·quality로 분리한다.
+3. PASS/FAIL/BLOCKED를 environment, isolation, credential, protocol, quality로 분리한다.
 4. Human Step이 실제로 완료됐는지 확인한다.
-5. product diff와 final Git status를 확인한다.
-6. 불완전한 evidence를 전체 Gate PASS로 확대하지 않는다.
-7. 승인 범위에서 Task/STATUS/Gate/Issue를 갱신한다.
-8. 다음 내부 검증은 검증 질문 하나로 나눈다.
+5. Enterprise invariant, product diff, final Git status를 확인한다.
+6. 수동 복구가 있었다면 PASS로 승격하지 않는다.
+7. 불완전한 evidence를 전체 Gate PASS로 확대하지 않는다.
+8. 승인 범위에서 Task/STATUS/Gate/Issue를 갱신한다.
+9. 다음 내부 검증은 검증 질문 하나로 나눈다.
 
 ## 설계 변경 기록 위치
 
@@ -245,6 +281,7 @@ Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 - 여러 Task에 영향: `DECISIONS.md`
 - Stage/Gate 구조: `STAGES.md`
 - 제품 목적·책임 경계: `PROJECT.md`
+- Claude 실행/격리: `CLAUDE_CODE_ISOLATION.md`
 - 반복 함정: `TRAPS.md`
 - 보안 경계: `SECURITY.md`
 - 역할·handoff: `ROLES_AND_HANDOFF.md`
@@ -262,11 +299,14 @@ Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 6. Human Step과 Internal Step이 구분됐는가
 7. candidate/instruction SHA handoff가 명확한가
 8. 내부 PASS 전 코드 PR merge 금지 조건이 적용됐는가
-9. Issue/PR이 canonical Task를 정확히 가리키는가
-10. 실제 secret/raw evidence가 tracked content에 없는가
-11. Internal Validator에게 GitHub write/source 수정이 요구되지 않았는가
-12. 다음 Task는 Human Gate 없이 전진하지 않았는가
-13. 새 세션이 읽을 정확한 다음 행동이 남아 있는가
+9. Claude Task가 Enterprise invariant와 allowed surface를 구분하는가
+10. `claude`와 `company-claude` 경계가 명확한가
+11. actual LOCALAPPDATA에서 unsafe Stock start/save를 요구하지 않는가
+12. Issue/PR이 canonical Task를 정확히 가리키는가
+13. 실제 secret/raw evidence가 tracked content에 없는가
+14. Internal Validator에게 GitHub write/source 수정이 요구되지 않았는가
+15. 다음 Task는 Human Gate 없이 전진하지 않았는가
+16. 새 세션이 읽을 정확한 다음 행동이 남아 있는가
 
 변경이 없으면 억지로 문서를 수정하지 않는다.
 
@@ -288,6 +328,7 @@ Repository: knadalkim-a11y/ccr-enterprise-wrapper
 COMPANY_WRAPPER, project-state, STATUS, PROJECT, DECISIONS, STAGES,
 ROLES_AND_HANDOFF, AGENT_WORKFLOW, 활성 Task와 Required knowledge를 읽어라.
 
+Claude 관련 Task이면 CLAUDE_CODE_ISOLATION을 반드시 읽어라.
 작업 전에 Context checksum을 보고하라.
 문서가 충돌하면 충돌부터 보고하라.
 사내 에이전트는 pull-only INTERNAL_VALIDATOR이며 Task 자율 선택,
