@@ -1,34 +1,30 @@
 ---
 id: V1-S1-T01
 stage: V1-S1
-title: Finalize internal Gemma Chat provider connection
+title: Finalize internal Gemma Chat provider connection in isolated runtime
 kind: validation
-status: in_progress
+status: blocked
+blocker: V1-S1-T00
 primary_actor: INTERNAL_VALIDATOR
 execution_mode: human_assisted
 implementation_required: false
 internal_validation: required
 github_write_allowed: false
 candidate_sha: 97b73a9f4e1fb23d406bb987d0785cefa1f99966
-instruction_sha: supplied_by_human_gate_owner
+instruction_sha: supplied_after_unblock
 merge_policy: not_applicable
 depends_on:
-  - V1-S0-T02
+  - V1-S1-T00
 required_capabilities:
   - WINDOWS_RUNTIME_ALLOWED
   - LLM_CREDENTIAL_AUTHORIZED_FOR_HOST
 allowed_git_actions:
   - fetch
-  - pull_ff_only
   - detached_checkout
   - show_task_at_instruction_sha
   - rev_parse
   - status
   - diff_exit_code
-allowed_paths:
-  - company/tasks/v1-s1/V1-S1-T01-GEMMA-PROVIDER-CHECK.md
-  - company/docs/STATUS.md
-  - company/gates/V1-S1.md
 forbidden_paths:
   - packages/**
   - package.json
@@ -36,32 +32,32 @@ forbidden_paths:
 human_decision: pending
 ---
 
-# Finalize Internal Gemma Chat Provider Connection
+# Finalize Internal Gemma Chat Provider Connection in Isolated Runtime
 
 ## Validation question
 
-> Stock CCR가 사내 Windows에서 source 수정 없이 사내 Gemma Provider를 `openai_chat_completions` 전용으로 저장·영속화하고, 검증을 안전하게 종료할 수 있는가?
+> V1-S1-T00에서 승인된 CCR runtime sandbox를 사용해 Enterprise Claude 환경을 변경하지 않으면서, 사내 Gemma Provider를 `openai_chat_completions` 전용으로 저장·영속화하고 안전하게 종료할 수 있는가?
 
-이 Task는 Provider 계층만 닫는다.
-Profile, local gateway completion, Streaming, Tool, Claude Code는 별도 Task다.
-
-## Task classification
+## Current status
 
 ```text
-Primary actor: INTERNAL_VALIDATOR
-Execution mode: human_assisted
-Implementation required: NO
-Product code PR: NOT_APPLICABLE
-GitHub write by Internal Validator: NO
+BLOCKED_ON:
+V1-S1-T00 runtime sandbox and Enterprise baseline invariance
+
+DO NOT EXECUTE:
+until V1-S1-T00 is accepted and a new instruction SHA is issued
 ```
+
+기존 protocol evidence는 유효하다.
+기존 CCR runtime config와 글로벌 client state를 그대로 재개하는 것은 금지한다.
 
 ## Confirmed evidence
 
-### Attempt 1 — credential host scope blocker
+### Attempt 1 — credential host scope
 
-- 이전 credential은 선택한 PC/source scope에서 허용되지 않아 `401`이 발생했다.
-- 분류: `BLOCKED_CREDENTIAL_HOST_SCOPE`
-- CCR, Gemma, protocol 결함으로 판정하지 않았다.
+- 이전 credential이 선택한 host/source scope에서 허용되지 않아 `401`.
+- 분류: `BLOCKED_CREDENTIAL_HOST_SCOPE`.
+- 신규 host-authorized credential 발급 후 해소.
 
 ### Attempt 2 — protocol capability
 
@@ -88,49 +84,6 @@ Selected protocol: openai_chat_completions only
 OpenAI Responses: UNSUPPORTED_OR_INCOMPATIBLE, NON_BLOCKING
 ```
 
-Responses 500은 현재 Provider 전체 실패가 아니다.
-`/v1/responses` 공식 지원 여부 또는 CCR 호환성 원인 분석은 실제 요구가 생길 때 별도 Task로 수행한다.
-
-## Candidate contract
-
-```text
-Instruction SHA:
-→ Human Gate Owner가 사내 시작 프롬프트에 exact SHA로 제공
-
-Candidate SHA:
-→ 97b73a9f4e1fb23d406bb987d0785cefa1f99966
-
-Mode:
-→ validation-only two-ref exception
-```
-
-현재 candidate는 V1-S0에서 install/build/runtime이 검증된 product commit이다.
-Instruction SHA와 candidate SHA가 다르므로 최종 Evidence에 둘 다 기록한다.
-이 Task에서는 제품 경로를 수정하지 않으며 `packages`, `package.json`, `package-lock.json` diff `0`으로 동등성 경계를 확인한다.
-
-## Required knowledge
-
-- `company/docs/ROLES_AND_HANDOFF.md`
-- `company/docs/INTERNAL_VALIDATION.md`
-- `company/docs/SECURITY.md`
-- `company/docs/ENVIRONMENTS.md`
-- `company/gates/V1-S1.md`
-- `packages/core/src/providers/probe.ts`
-
-## Protocol evidence boundary
-
-CCR `v3.0.22` probe는 다음처럼 protocol별 요청을 분리한다.
-
-```text
-openai_chat_completions
-→ POST /v1/chat/completions
-→ messages + max_tokens
-
-openai_responses
-→ POST /v1/responses
-→ input + max_output_tokens
-```
-
 Chat PASS로 확인된 것:
 
 - 현재 host/source scope에서 credential 사용 가능
@@ -144,156 +97,104 @@ Responses HTTP 500만으로 다음을 확정하지 않는다.
 - CCR Responses 구현 결함
 - 특정 replica 고장
 
-## In scope
+## New isolation boundary
+
+사내 복구에서 다음 side effect가 확인됐다.
+
+```text
+Enterprise Claude Code settings에 CCR Base URL/WIF/Federation 값 잔존
+실제 %LOCALAPPDATA%\Claude-3p에 CCR third-party inference config 잔존
+Router stop만으로 원래 Enterprise 상태가 자동 복구되지 않음
+```
+
+따라서 이 Task는 다음 조건에서만 재개한다.
+
+```text
+CCR management/service
+→ approved sandbox LOCALAPPDATA
+
+Enabled global/System-default Claude Code profile
+→ 0
+
+Actual Enterprise settings
+→ immutable
+
+Actual Claude-3p
+→ immutable
+
+Request logs / Agent observability
+→ OFF
+```
+
+상세 계약은 `company/docs/CLAUDE_CODE_ISOLATION.md`와 `V1-S1-T00`을 따른다.
+
+## Required knowledge
+
+- `company/docs/CLAUDE_CODE_ISOLATION.md`
+- `company/docs/INTERNAL_VALIDATION.md`
+- `company/docs/SECURITY.md`
+- `company/docs/TRAPS.md`
+- `company/gates/V1-S1.md`
+- `packages/core/src/providers/probe.ts`
+- `packages/core/src/agents/claude-app/gateway-service.ts`
+- `packages/core/src/web/management-server.ts`
+
+## Scope after reactivation
+
+### In scope
 
 - exact instruction/candidate SHA 기록
-- current candidate와 clean working tree 확인
-- 기존 Gemma Provider를 Chat-only/manual protocol로 저장
+- accepted sandbox launcher/manual boundary 사용
+- Enterprise baseline before fingerprint
+- existing Gemma Provider를 manual Chat-only로 저장
 - reopen/refresh 후 Provider 영속화 확인
-- 실제 사용자 prompt 전 Request logs와 Agent observability OFF 확인
+- Request logs OFF
+- Agent observability OFF
+- enabled global Claude Code profiles = `0`
 - `Connect agent`, `Let's start` 미진행
 - CCR 정상 종료
-- 제품 source/lockfile 무변경 확인
-- sanitized evidence 반환
+- Enterprise baseline after = unchanged
+- product source/lockfile 무변경
+- sanitized Evidence 반환
 
-## Out of scope
+### Out of scope
 
-- 새 Provider 중복 생성
-- `/v1/responses` 추가 요청 또는 root-cause 분석
-- `Connect agent` / Profile 생성
-- `Let's start`
+- Stock CCR start/save를 실제 LOCALAPPDATA에서 실행
+- System default/global Claude Code profile
+- 새 Claude Code profile 생성
+- `Connect agent` / `Let's start`
 - local gateway basic completion
 - Streaming
 - Tool call/result continuation
 - Claude Code 실행
-- GLM 설정
-- Wrapper/Routing/Telemetry/V2 구현
-- source/dependency/script 수정
-- Internal Validator의 GitHub write
+- Claude App/Desktop 연결
+- `/v1/responses` 추가 조사
+- source/dependency/runtime DB 직접 수정
+- Internal Validator GitHub write
 
-## Actor plan
+## Reactivation contract
 
-| Order | Actor | Responsibility | Handoff |
-|---:|---|---|---|
-| 1 | `HUMAN_GATE_OWNER` | Task, instruction SHA, candidate SHA 승인 | Internal Validator 시작 |
-| 2 | `INTERNAL_VALIDATOR` | Preflight 후 Human Step 준비 | H1에서 멈춤 |
-| 3 | `HUMAN_GATE_OWNER` | Provider 저장·로그 안전 설정을 로컬 UI에서 수행 | 완료 상태만 반환 |
-| 4 | `INTERNAL_VALIDATOR` | stop, diff, status, sanitized evidence | Human Gate Owner에게 반환 |
-| 5 | `CHATGPT_ORCHESTRATOR` | Evidence 검토와 canonical 상태 갱신 | Human decision 대기 |
+V1-S1-T00가 PASS한 뒤 ChatGPT Orchestrator가:
 
-## A1 — [INTERNAL_VALIDATOR] Preflight
+1. 이 Task를 `ready_internal`로 변경한다.
+2. exact instruction SHA를 발행한다.
+3. T00에서 승인된 sandbox 시작 절차를 포함한다.
+4. Provider finalization 전후 Enterprise baseline equality를 요구한다.
 
-Human Gate Owner가 제공한 exact instruction SHA에서 이 Task를 읽은 뒤 candidate를 checkout한다.
+현재 문서만으로 사내 검증을 시작하지 않는다.
 
-```powershell
-git fetch --prune origin
-git show <INSTRUCTION_SHA>:company/tasks/v1-s1/V1-S1-T01-GEMMA-PROVIDER-CHECK.md
-git checkout --detach 97b73a9f4e1fb23d406bb987d0785cefa1f99966
+## Acceptance criteria after reactivation
 
-$TestedCommit = git rev-parse HEAD
-git status --short
-
-node --version
-npm --version
-node -p "process.platform"
-node -p "process.arch"
-
-$Cli = "packages/cli/dist/main/cli.js"
-$CliExists = Test-Path $Cli
-
-$TestedCommit
-$CliExists
-```
-
-진행 조건:
-
-```text
-candidate SHA exact match
-working tree clean
-process.platform = win32
-CLI exists = True
-required capabilities = YES
-```
-
-조건이 맞으면 Human Step H1을 요청하고 멈춘다.
-Dirty tree면 임의로 정리하지 않고 경로만 보고한다.
-
-## H1 — [HUMAN_GATE_OWNER] Provider와 logging finalization
-
-사내 로컬 CCR UI에서 수행한다.
-
-1. 기존 Gemma Provider를 중복 생성하지 않는다.
-2. `Auto detect protocols`를 OFF로 둔다.
-3. `OpenAI Chat Completions`만 선택한다.
-4. `OpenAI Responses`는 선택 해제한다.
-5. Provider를 저장한다.
-6. Provider 목록 또는 reopen/refresh 후 설정이 유지되는지 확인한다.
-7. 실제 사용자 prompt 전에 Request logs와 Agent observability를 OFF로 둔다.
-8. `Connect agent`와 `Let's start`는 수행하지 않는다.
-
-Agent output에 넣지 않는다.
-
-```text
-actual endpoint
-API Key
-actual model ID
-host/IP/proxy/egress
-management URL/token
-raw request/response
-```
-
-Internal Validator에 반환할 최소 상태:
-
-```text
-Provider saved: PASS / FAIL
-Provider persisted: PASS / FAIL
-Auto detect: OFF / ON
-Selected protocol: openai_chat_completions / OTHER
-Responses selected: NO / YES
-Request logs: OFF / ON / UNKNOWN
-Agent observability: OFF / ON / UNKNOWN
-Connect agent executed: NO / YES
-Let's start executed: NO / YES
-```
-
-## A2 — [INTERNAL_VALIDATOR] Cleanup and evidence
-
-H1 결과를 받은 뒤 실행한다.
-
-```powershell
-node $Cli stop
-$StopExit = $LASTEXITCODE
-
-git diff --exit-code -- packages package.json package-lock.json
-$ProductDiffExit = $LASTEXITCODE
-
-git status --short
-
-$StopExit
-$ProductDiffExit
-```
-
-기대 결과:
-
-```text
-StopExit = 0
-ProductDiffExit = 0
-Final git status = clean
-```
-
-실패를 통과시키기 위해 source, runtime DB, protocol, dependency를 수정하지 않는다.
-
-## Acceptance criteria
-
-- [ ] exact instruction SHA 기록
-- [ ] exact candidate SHA `97b73a9f...` 기록
-- [ ] working tree before finalization clean
 - [x] `WINDOWS_RUNTIME_ALLOWED = YES`
 - [x] `LLM_CREDENTIAL_AUTHORIZED_FOR_HOST = YES`
-- [x] `CLAUDE_CODE_EXECUTION_ALLOWED = YES`
 - [x] Direct Chat Completions PASS
 - [x] CCR Chat Completions Check Connection PASS
-- [x] Responses HTTP 500을 non-blocking deferred capability로 분리
+- [x] Responses HTTP 500 non-blocking 분리
+- [ ] V1-S1-T00 Human decision `ACCEPTED`
+- [ ] exact instruction/candidate SHA 기록
+- [ ] accepted sandbox runtime 사용
+- [ ] enabled global Claude Code profiles = `0`
+- [ ] Enterprise baseline before PASS
 - [ ] Provider saved PASS
 - [ ] Provider persisted after reopen/refresh PASS
 - [ ] Auto detect OFF
@@ -303,100 +204,46 @@ Final git status = clean
 - [ ] Agent observability OFF
 - [ ] Connect agent / Let's start 미진행
 - [ ] CCR stop exit `0`
+- [ ] Enterprise settings/Claude-3p/User/Machine env after = SAME
+- [ ] manual rollback required = NO
 - [ ] product diff exit `0`
 - [ ] final Git status clean
 - [ ] secret/raw evidence 외부 반출 없음
 - [ ] Internal Validator Git write 없음
 - [ ] 다음 Task 미시작
 
-## Stop conditions
-
-- instruction 또는 candidate SHA가 불명확함
-- candidate SHA 불일치
-- working tree dirty
-- required capability가 `NO / UNKNOWN`
-- Provider가 저장되지 않거나 reopen 후 사라짐
-- Chat-only 상태를 만들기 위해 source 수정이 필요함
-- Request body logging을 안전하게 끌 수 없음
-- stop 또는 product diff 실패
-- secret/raw evidence를 외부로 옮겨야만 진단 가능함
-
 ## Failure classification
 
+- `ISOLATION_PRECONDITION`
+- `ISOLATION_BREACH`
 - `PROVIDER_PERSISTENCE`
 - `PROTOCOL_COMPATIBILITY`
 - `LOGGING_SAFETY`
 - `SHUTDOWN`
 - `PRODUCT_DIFF`
-- `WINDOWS_ENVIRONMENT`
 - `UNKNOWN`
 
-Responses HTTP 500은 `PROTOCOL_COMPATIBILITY` 관찰이지만 현재 Chat-only Provider의 Task failure가 아니다.
-
-## Sanitized evidence template
-
-```text
-Role: INTERNAL_VALIDATOR
-Task ID: V1-S1-T01
-Session role: internal validation finalization
-Instruction SHA:
-Candidate SHA:
-Environment alias:
-Capability matrix:
-
-A1 Preflight:
-- candidate match:
-- working tree clean:
-- CLI exists:
-
-H1 Human step:
-- Provider saved:
-- Provider persisted:
-- Auto detect protocols:
-- Selected protocol: openai_chat_completions
-- Responses selected: NO
-- Request logs:
-- Agent observability:
-- Connect agent executed: NO
-- Let's start executed: NO
-
-Protocol evidence:
-- Direct Chat Completions: PASS
-- CCR Chat Completions: PASS
-- CCR Responses: FAIL, HTTP 500
-- Responses classification: UNSUPPORTED_OR_INCOMPATIBLE, NON_BLOCKING
-
-A2 Cleanup:
-- CCR stop / exit code:
-- product diff / exit code:
-- final git status:
-
-Failure classification:
-Reproducibility:
-Sanitized observation:
-Secrets/raw evidence exported: NO
-Git write performed: NO
-Next Task started: NO
-```
+Responses HTTP 500은 현재 Chat-only Provider의 Task failure가 아니다.
 
 ## Attempts
 
-| Attempt | Actor / session role | Candidate | Instruction | Internal | Recommendation |
-|---:|---|---|---|---|---|
-| 1 | Internal validation | V1-S0 product tree | earlier Task instruction | `BLOCKED_CREDENTIAL_HOST_SCOPE` | Approved credential 필요 |
-| 2 | Internal protocol validation | `97b73a9f...` | earlier Task instruction | Direct Chat PASS; CCR Chat PASS; Responses HTTP 500 | Chat-only finalization 진행 |
-| 3 | Internal finalization | `97b73a9f...` | supplied at handoff | `PENDING` | H1 + cleanup evidence 필요 |
+| Attempt | Actor / session role | Candidate | Internal result | Recommendation |
+|---:|---|---|---|---|
+| 1 | Internal validation | V1-S0 product tree | `BLOCKED_CREDENTIAL_HOST_SCOPE` | approved credential 필요 |
+| 2 | Internal protocol validation | `97b73a9f...` | Direct Chat PASS; CCR Chat PASS; Responses HTTP 500 | Chat-only finalization 후보 |
+| 3 | Internal recovery observation | same host | Enterprise client/Claude-3p CCR config persistence 확인; 수동 복구 PASS | runtime isolation prerequisite 필요 |
+| 4 | Provider finalization | `97b73a9f...` | `BLOCKED_ON_V1-S1-T00` | T00 acceptance 후 재개 |
 
 ## Evidence / limitations
 
-- Chat PASS는 Provider-level basic connectivity만 증명한다.
-- Local gateway completion, Streaming, Tool, Claude Code는 아직 증명하지 않았다.
-- Responses 지원 여부는 인프라 공식 계약 또는 별도 Task가 필요하다.
-- Auto-detect UX 개선은 현재 Core patch 대상이 아니다.
+- Provider protocol evidence는 보존된다.
+- Provider persistence와 isolated runtime finalization은 아직 증명되지 않았다.
+- Local gateway completion, Streaming, Tool, Claude Code는 미검증이다.
+- Claude App/Desktop은 V1 초기 범위 밖이다.
 
 ## Agent recommendation
 
-`CONTINUE` — 승인된 instruction/candidate SHA로 H1 Provider finalization과 A2 cleanup만 수행한다.
+`STOP` — V1-S1-T00가 승인되기 전에는 이 Task를 실행하지 않는다.
 
 ## Human decision
 
