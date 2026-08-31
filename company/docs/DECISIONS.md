@@ -131,3 +131,18 @@
 - Candidate: 구현 Task는 `instruction_sha == candidate_sha == PR head SHA`를 기본으로 한다. Validation-only 예외는 두 SHA와 product tree equivalence를 기록한다.
 - Merge: `internal_validation: required` 코드 PR은 exact PR head의 `INTERNAL_PASS` 전 병합하지 않는다.
 - Rationale: 사외 개발과 사내 비밀 환경 검증을 분리하면서도, 어떤 코드와 어떤 지침이 검증됐는지 재현 가능하게 유지한다.
+
+## D-017 — Enterprise Claude는 불변이며 CCR는 별도 명령과 이중 격리로 실행
+
+- Status: ACCEPTED_AS_V1_DEFAULT
+- Decision: 일반 `claude`는 항상 기존 Enterprise 설정·인증·모델을 사용하고, CCR는 별도 논리 명령 `company-claude`로만 실행한다.
+- Client isolation: Claude Code profile은 `Only opened from CCR`(`scope=ccr`) + `CLI only`만 허용한다. `System default`는 V1에서 금지한다.
+- Runtime isolation: Stock CCR management/service는 process-local sandbox `LOCALAPPDATA`에서 실행해 실제 `%LOCALAPPDATA%\Claude-3p` 동기화 side effect를 격리한다.
+- Enterprise invariants: `%USERPROFILE%\.claude\settings.json`, 실제 Claude-3p, User/Machine CCR env, 일반 `claude` resolution, Enterprise auth/models와 일반 Claude Desktop은 변경하지 않는다.
+- Failure semantics: CCR service ON/OFF가 일반 `claude`를 자동 전환하지 않는다. `company-claude`는 CCR unavailable 시 Enterprise/Sonnet으로 자동 fallback하지 않고 명확히 실패한다.
+- Evidence: 사내 복구에서 CCR Base URL과 WIF/Federation 값이 Enterprise settings에 잔존했고, 실제 Claude-3p의 third-party inference config도 수동 제거가 필요했다.
+- Rationale: 복구를 자동화하는 것보다 정상 실행에서 복구가 필요 없는 격리 구조가 안전하고, 모델 경계·비용 측정도 명확하다.
+- Validation: `V1-S1-T00`에서 process-local `LOCALAPPDATA` sandbox와 Enterprise before/during/after invariance를 증명한다.
+- Consequence: `V1-S1-T01` Provider finalization은 T00 승인 전까지 중단한다.
+- Consequence: Claude App/Desktop CCR 연결은 별도 Task 전까지 제외하며, 실제 Claude-3p 불변성은 지금부터 안전 Gate다.
+- Fallback: sandbox가 실패한 경우에만 `CCR_DISABLE_CLAUDE_APP_GATEWAY_SYNC` 같은 최소 명시적 Core patch를 증거 기반으로 검토한다.
