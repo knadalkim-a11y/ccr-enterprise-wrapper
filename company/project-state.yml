@@ -15,14 +15,24 @@ workflow:
   external_development: codex
   internal_mode: pull-only-validation
   default_policy: native
+  claude_execution:
+    enterprise_command: claude
+    company_command: company-claude
+    enterprise_baseline: immutable
+    profile_scope: ccr
+    profile_surface: cli
+    runtime_localappdata: sandbox_required
 
 current:
   stage: V1-S1
+  task_id: V1-S1-T00
+  task_path: company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md
+  status: ready_internal
+
+next:
   task_id: V1-S1-T01
   task_path: company/tasks/v1-s1/V1-S1-T01-GEMMA-PROVIDER-CHECK.md
-  status: in_progress
-
-next: null
+  condition: V1-S1-T00 accepted
 
 validation:
   last_internal_commit: 97b73a9f4e1fb23d406bb987d0785cefa1f99966

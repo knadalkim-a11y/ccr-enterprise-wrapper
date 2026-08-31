@@ -11,13 +11,47 @@ CCR upstream
   retry/fallback · streaming · tools · observability · extensions
 
 Wrapper V1
-= 사내 설치·연결·호환성·진단·검증 기반
+= 사내 설치·연결·격리·호환성·진단·검증 기반
 
 Wrapper V2
 = CCR Native를 유지하면서 검증된 반복 품질 실패에만 개입
 ```
 
 정책(`native`, `force-model`, `static-economy`, `adaptive-quality`)은 제품 버전과 별개다.
+
+## Claude Code 실행 계약
+
+기존 Enterprise Claude 환경을 덮어쓰지 않고 실행 경로를 분리한다.
+
+```text
+claude
+→ 기존 Enterprise Claude Code
+→ 기존 settings/auth/models
+
+company-claude
+→ CCR 전용 Claude Code
+→ isolated CCR profile + Local CCR + internal model
+```
+
+`company-claude`는 V1의 논리적 명령 이름이다. 실제 `.cmd`, PowerShell launcher 또는 패키지는 후속 구현 Task에서 확정한다.
+
+CCR service ON/OFF는 일반 `claude`의 설정을 자동 전환하지 않는다.
+이미 실행 중인 Company 세션도 CCR가 중지되면 Enterprise/Sonnet으로 자동 fallback하지 않고 명확히 실패한다.
+
+V1 Claude Code profile:
+
+```text
+Effect scope: Only opened from CCR
+Internal scope: ccr
+Entry mode: CLI only
+System default: prohibited
+Claude App/Desktop CCR integration: deferred
+```
+
+`Only opened from CCR`는 Claude Code settings를 격리하지만, Stock CCR management start/config save는 별도로 `%LOCALAPPDATA%\Claude-3p`를 동기화할 수 있다.
+따라서 CCR service/admin process도 process-local sandbox `LOCALAPPDATA`에서 실행해야 한다.
+
+상세 계약은 `company/docs/CLAUDE_CODE_ISOLATION.md`를 따른다.
 
 ## 실행환경과 권한
 
@@ -57,13 +91,13 @@ INTERNAL_VALIDATOR
 → 사내 Windows에서 pull-only test; GitHub write와 source 수정 금지
 
 HUMAN_GATE_OWNER
-→ 사내 권한·evidence 전달·Stage Gate·다음 Task 최종 승인
+→ 사내 권한·secret/UI 작업·evidence 전달·Stage Gate·다음 Task 승인
 ```
 
 상세 권한과 handoff는 `company/docs/ROLES_AND_HANDOFF.md`를 따른다.
 사내 코딩 에이전트는 이름과 관계없이 `INTERNAL_VALIDATOR`이며 pull-only다.
 
-## 현재 모델 순서
+## 현재 모델·프로토콜 순서
 
 모델 순서는 architecture가 아니라 serving availability를 따른다.
 
@@ -72,7 +106,39 @@ HUMAN_GATE_OWNER
 GLM: serving rollout 완료 후 별도 onboarding
 ```
 
-활성 Task와 실제 상태는 `project-state.yml`과 `STATUS.md`를 따른다.
+현재 Gemma V1 protocol:
+
+```text
+openai_chat_completions only
+Auto detect OFF
+openai_responses HTTP 500 → deferred non-blocking
+```
+
+활성 Task와 실제 상태는 `company/project-state.yml`과 `company/docs/STATUS.md`를 따른다.
+
+## 현재 안전 선행조건
+
+사내 복구에서 Router stop 후에도 Claude Code의 CCR Base URL/WIF/Federation 설정과 Claude Desktop의 third-party inference 설정이 남는 현상이 확인됐다.
+
+따라서 현재 활성 Task는 Provider finalization이 아니라:
+
+```text
+V1-S1-T00
+→ sandbox CCR Runtime
+→ Enterprise settings/actual Claude-3p/env/normal claude invariance
+```
+
+이다.
+
+T00 PASS 전에는:
+
+```text
+actual LOCALAPPDATA에서 Stock CCR start/save 금지
+System default profile 금지
+Connect agent / Let's start 금지
+real model request 금지
+V1-S1-T01 재개 금지
+```
 
 ## 운영 토폴로지와 절감 측정
 
@@ -91,7 +157,7 @@ Fleet analytics plane
 ```
 
 사용자는 endpoint, protocol, model, key, CCR start/stop을 직접 설정하지 않는다.
-Company installer, launcher, doctor가 PC 단위 설치·설정·업데이트를 담당한다.
+Company installer, `company-claude` launcher, doctor가 PC 단위 설치·설정·격리·업데이트를 담당한다.
 
 중앙 통계 취합은 중앙 CCR Gateway를 의미하지 않는다.
 Local CCR의 장애 격리는 유지하고, prompt/response/source 없이 모델·토큰·fallback·오류 같은 metadata만 모은다.
@@ -119,9 +185,10 @@ Sonnet fallback rate와 internal call amplification을 함께 보며,
 5. `company/docs/STATUS.md`
 6. `company/docs/TRAPS.md`
 7. `project-state.yml`의 `current.task_path`
-8. 실행환경 검증이 있으면 `company/docs/ENVIRONMENTS.md`
-9. 사내 model/Claude Code 검증이면 `company/docs/SECURITY.md`, `company/docs/INTERNAL_VALIDATION.md`
-10. 설치·Fleet·Telemetry·절감 평가 Task이면 `company/docs/FLEET_OPERATING_MODEL.md`
+8. 실행환경 검증이면 `company/docs/ENVIRONMENTS.md`
+9. Claude/CCR Task이면 `company/docs/CLAUDE_CODE_ISOLATION.md`
+10. 사내 model 검증이면 `company/docs/SECURITY.md`, `company/docs/INTERNAL_VALIDATION.md`
+11. 설치·Fleet·Telemetry·절감 Task이면 `company/docs/FLEET_OPERATING_MODEL.md`
 
 ## 새 설계 세션 진입점
 

@@ -29,6 +29,9 @@ CHATGPT_ORCHESTRATOR / EXTERNAL_CODEX
 - management URL/token
 - raw CCR database/log/trace
 - 계약 가격과 raw internal logs
+- Enterprise settings 원문 또는 로컬 recovery backup
+- CCR identity token/helper 파일 원문
+- 실제 baseline fingerprint/hash 값과 내부 파일 목록
 
 ## Placeholder와 alias
 
@@ -90,6 +93,94 @@ CLAUDE_CODE_EXECUTION_ALLOWED
 Provider check에는 앞의 두 권한이 필요하다.
 Claude Code E2E에는 세 권한이 모두 필요하다.
 한 PC가 Windows에서 CCR를 실행할 수 있다는 사실만으로 LLM key 또는 Claude Code 사용 권한을 추론하지 않는다.
+
+## Enterprise Claude baseline invariance
+
+V1은 기존 Enterprise Claude 환경을 불변으로 취급한다.
+
+```text
+claude
+→ Enterprise lane
+
+company-claude
+→ CCR lane
+```
+
+CCR service 상태는 일반 `claude`의 설정을 자동 전환하지 않는다.
+
+### 불변 영역
+
+```text
+%USERPROFILE%\.claude\settings.json
+actual %LOCALAPPDATA%\Claude-3p
+normal claude command resolution
+Windows User/Machine CCR-managed env
+Enterprise auth/models
+normal Claude Desktop state
+```
+
+### 허용 영역
+
+```text
+%APPDATA%\claude-code-router\**
+%APPDATA%\CompanyCCR\runtime-localappdata\**
+CCR-scoped profile/settings
+CCR wrapper/token/MCP files
+local recovery backup outside repository
+```
+
+### V1 금지
+
+```text
+System default Claude Code profile
+actual LOCALAPPDATA에서 Stock CCR start/save
+User/Machine env에 CCR 값 영구 저장
+normal claude command replacement
+Enterprise settings에 CCR Base URL/WIF/model/helper 삽입
+Claude App/Desktop CCR 연결
+CCR failure 시 Enterprise/Sonnet 자동 fallback
+```
+
+### 관리 대상 marker
+
+Enterprise 기본 설정에서 다음이 새로 나타나면 `ISOLATION_BREACH` 후보다.
+
+```text
+ANTHROPIC_BASE_URL
+ANTHROPIC_API_BASE_URL
+CLAUDE_AGENT_API_BASE_URL
+ANTHROPIC_FEDERATION_RULE_ID
+ANTHROPIC_ORGANIZATION_ID
+ANTHROPIC_IDENTITY_TOKEN
+ANTHROPIC_IDENTITY_TOKEN_FILE
+ANTHROPIC_SERVICE_ACCOUNT_ID
+ANTHROPIC_WORKSPACE_ID
+ANTHROPIC_SCOPE
+ANTHROPIC_PROFILE
+ANTHROPIC_MODEL
+CCR_CLAUDE_CODE_MODEL
+CODEXL_CLAUDE_CODE_MODEL
+ANTHROPIC_DEFAULT_FABLE_MODEL
+ANTHROPIC_DEFAULT_OPUS_MODEL
+ANTHROPIC_DEFAULT_SONNET_MODEL
+ANTHROPIC_DEFAULT_HAIKU_MODEL
+ANTHROPIC_SMALL_FAST_MODEL
+CCR_CLAUDE_CODE_MCP_CONFIG
+CODEXL_CLAUDE_CODE_MCP_CONFIG
+apiKeyHelper
+```
+
+원래 Enterprise가 동일 이름의 값을 사용했다면 삭제가 아니라 기존 값 보존이 기준이다.
+
+### Fingerprint와 backup
+
+- 설정/디렉터리 fingerprint는 사내 세션 안에서 equality 비교에만 사용한다.
+- 외부 handoff에는 `SAME / CHANGED / ABSENT`만 반환한다.
+- Enterprise settings backup은 해당 PC의 승인된 로컬 recovery 폴더에만 둔다.
+- backup을 Git, repository, issue, PR 또는 승인되지 않은 공유 폴더에 넣지 않는다.
+- 수동 backup 복구가 필요하면 해당 Task는 PASS가 아니라 `ISOLATION_BREACH`다.
+
+상세 설계는 `company/docs/CLAUDE_CODE_ISOLATION.md`를 따른다.
 
 ## Protocol capability boundary
 
@@ -174,6 +265,7 @@ raw CCR database/log/trace file
 - `Sonnet baseline 대비 추정 외부 비용 회피액`은 counterfactual 추정치이며 `확정 절감액`으로 표현하지 않는다.
 - 사용자 명시적 model/profile override는 자동 정책 절감 KPI와 분리한다.
 - V1 transport 지표를 전체 업무 생산성 향상으로 확대 해석하지 않는다.
+- `company-claude` 경로만 CCR avoidance 측정 대상으로 포함하고 일반 `claude` Enterprise 사용은 별도 baseline/직접 사용으로 분리한다.
 
 ## 일반 원칙
 

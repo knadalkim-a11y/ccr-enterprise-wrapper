@@ -8,6 +8,7 @@
 
 역할과 GitHub 권한은 `company/docs/ROLES_AND_HANDOFF.md`를 따른다.
 새 설계 세션은 `company/docs/DESIGN_SESSION_PLAYBOOK.md`로 상태를 복원한다.
+Claude Code 관련 Task는 `company/docs/CLAUDE_CODE_ISOLATION.md`를 따른다.
 
 ## Repository Bootstrap
 
@@ -33,9 +34,9 @@ Node LTS >= 22
 
 Status: `ACCEPTED`.
 
-### V1-S1 — Internal Provider Contract
+### V1-S1 — Internal Provider and Gateway Contract
 
-Credential 사용 권한이 있는 사내 Windows host에서 내부 모델 한 개로 Provider/gateway transport contract를 증명할 수 있는가?
+Credential 사용 권한이 있는 사내 Windows host에서 Enterprise Claude 환경을 변경하지 않고 내부 모델 한 개의 Provider/gateway transport contract를 증명할 수 있는가?
 
 Host precondition:
 
@@ -60,20 +61,45 @@ Auto detect OFF
 openai_responses HTTP 500 → deferred non-blocking
 ```
 
-Task sequence:
+#### V1-S1-T00 — CCR Runtime Sandbox
+
+질문:
+
+> CCR management/service를 process-local sandbox `LOCALAPPDATA`에서 실행하고 enabled global Claude Code profile을 제거해도 Enterprise settings, 실제 Claude-3p, User/Machine env와 일반 `claude`가 before/during/after 동일한가?
+
+이 Task는 real model request를 하지 않는다.
+PASS 전에는 Provider finalization과 Claude Code profile 실험을 재개하지 않는다.
+
+#### V1-S1-T01 — Gemma Provider Finalization
+
+T00 승인 후에만 재개한다.
 
 ```text
-V1-S1-T01 Provider connection and persistence
-→ basic local gateway completion
+accepted sandbox runtime
+→ Provider manual Chat-only save
+→ persistence
+→ logging OFF
+→ Enterprise invariance
+→ stop / product diff / clean tree
+```
+
+기존 Direct Chat와 CCR Chat PASS 증거는 보존한다.
+
+#### Remaining V1-S1 sequence
+
+```text
+V1-S1-T00 Runtime sandbox
+→ V1-S1-T01 Provider connection and persistence
+→ local gateway basic completion
 → streaming
 → tool call/result continuation
 → availability/error classification
 → Gemma scope decision
 ```
 
-Provider-level, gateway completion, streaming, tools를 각각 별도 검증 질문으로 분리한다.
+Provider-level, gateway completion, streaming, tools와 error classification을 각각 별도 검증 질문으로 분리한다.
 
-### V1-S2 — Claude Code Vertical Slice
+### V1-S2 — Dual-Isolated Claude Code Vertical Slice
 
 다음 세 capability가 모두 있는 host에서 검증한다.
 
@@ -81,6 +107,48 @@ Provider-level, gateway completion, streaming, tools를 각각 별도 검증 질
 WINDOWS_RUNTIME_ALLOWED
 LLM_CREDENTIAL_AUTHORIZED_FOR_HOST
 CLAUDE_CODE_EXECUTION_ALLOWED
+```
+
+사용자 실행 계약:
+
+```text
+claude
+→ Enterprise Claude Code
+
+company-claude
+→ CCR-scoped Claude Code
+```
+
+초기 V1 profile:
+
+```text
+Effect scope: Only opened from CCR
+Internal scope: ccr
+Entry mode: CLI only
+System default: prohibited
+Claude App/Desktop: deferred
+```
+
+Task sequence:
+
+```text
+Enterprise baseline manifest
+→ isolated CCR profile creation
+→ company-claude basic request
+→ Enterprise/CCR simultaneous separation check
+→ start/stop repeatability without manual rollback
+→ model-specific workload vertical slice
+```
+
+Gate는 다음을 요구한다.
+
+```text
+CCR request PASS
+Enterprise before/during/after PASS
+global settings diff NONE
+actual Claude-3p diff NONE
+User/Machine env diff NONE
+manual rollback NOT_REQUIRED
 ```
 
 Model-specific path:
@@ -111,8 +179,10 @@ N명의 사용자가 M대 승인 Windows PC에서 CCR 수동 설정 없이 사�
 
 검증 질문:
 
-- Multi-user Windows에서 논리적으로 PC당 CCR Runtime 하나가 가능한가
+- PC 또는 승인 runtime 단위의 Local CCR ownership이 가능한가
 - `%APPDATA%` 사용자 범위를 official option, runtime account 또는 launcher로 안전하게 제어 가능한가
+- `company-claude` launcher가 sandbox service start, isolated profile, fail-closed를 자동화할 수 있는가
+- 일반 `claude`와 Enterprise baseline을 immutable로 유지할 수 있는가
 - 사용자가 endpoint/protocol/model/key/start/stop을 직접 다루지 않아도 되는가
 - Provider/profile template과 host-authorized secret을 분리 가능한가
 - 실제 prompt 전 body capture OFF를 강제 가능한가
@@ -128,7 +198,7 @@ CCR configuration / official option
 → 증거가 있을 때만 최소 Core patch
 ```
 
-Gate는 한 대의 승인 PC에서 관리자 설치 후 비개발 사용자가 Company launcher만으로 시작할 수 있고, metadata source feasibility가 증명됐음을 요구한다.
+Gate는 한 대의 승인 PC에서 관리자 설치 후 비개발 사용자가 `company-claude`만으로 시작할 수 있고, 일반 `claude`는 계속 Enterprise 상태이며 metadata source feasibility가 증명됐음을 요구한다.
 
 ### V1-S4 — Repeatable Setup / Doctor
 
@@ -139,9 +209,10 @@ Setup 범위:
 ```text
 지원 Node/CCR/Wrapper version
 runtime/service 준비
+sandbox LOCALAPPDATA
 provider/profile template
 host-authorized credential 주입 경계
-Company launcher
+company-claude launcher
 body-capture policy
 telemetry source/destination
 update/rollback metadata
@@ -155,12 +226,15 @@ config/profile version
 credential host scope
 model entitlement/connectivity
 Claude Code host approval
+Enterprise baseline invariance
+actual Claude-3p invariance
 local gateway health
 logging/body-capture safety
 telemetry exporter/destination
 ```
 
-Gate는 문서화된 관리자 절차, idempotent 재실행, sanitized 결과, rollback을 요구한다.
+Gate는 문서화된 관리자 절차, idempotent 재실행, sanitized 결과와 emergency recovery를 요구한다.
+정상 lifecycle은 수동 rollback이 필요 없어야 한다.
 
 ### V1-S5 — Managed Local Safe Pilot
 
@@ -175,11 +249,13 @@ Gate는 문서화된 관리자 절차, idempotent 재실행, sanitized 결과, r
 
 Pilot 측정:
 
-- PC당 설치·업데이트·rollback 시간
+- PC당 설치·업데이트·emergency recovery 시간
 - 사용자 최초 실행 단계 수
+- `claude`와 `company-claude` 혼동/오사용
 - 설정 오류와 지원 요청
 - config/version drift
 - credential 발급·갱신 운영 부담
+- Enterprise baseline breach 수
 - metadata completeness와 batch dedupe
 - availability/error/latency
 - Internal-first rate
@@ -191,7 +267,7 @@ Pilot 측정:
 초기 중앙 취합은 승인된 공유 경로의 daily JSON/CSV batch로 시작할 수 있다.
 실시간 Collector는 필요성이 증명된 경우에만 만든다.
 
-Gate는 사용자가 CCR UI와 upstream key를 직접 다루지 않고, Fleet 상태와 transport routing KPI를 중앙에서 확인할 수 있음을 요구한다.
+Gate는 사용자가 CCR UI와 upstream key를 직접 다루지 않고, 일반 Enterprise 환경을 손상시키지 않으며 Fleet 상태와 transport routing KPI를 중앙에서 확인할 수 있음을 요구한다.
 
 ### V1-S6 — Sonnet Avoidance Experiment (Optional)
 
@@ -218,6 +294,7 @@ Internal logical call amplification
 Provider transport retry
 Input-token-weighted avoidance
 Error/latency
+Enterprise isolation breach = 0
 ```
 
 `Sonnet baseline 대비 추정 외부 비용 회피액`은 2차 지표다.
@@ -260,3 +337,4 @@ Release Gate:
 - Sonnet-only보다 낮은 Cost per Successful Task
 - Manual Override 보호
 - Native fail-open
+- Enterprise baseline invariance
