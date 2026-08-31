@@ -37,36 +37,36 @@ human_decision: pending
 
 ## Validation question
 
-> Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행하고 CCR의 활성 Claude Code 글로벌 프로필을 제거한 뒤에도, 기존 Enterprise Claude Code 설정·인증·모델과 실제 `%LOCALAPPDATA%\Claude-3p`가 전혀 변경되지 않는가?
+> Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행하고 활성 Claude Code global/System-default profile을 제거해도, 기존 Enterprise Claude Code 설정·인증·모델과 실제 `%LOCALAPPDATA%\Claude-3p`가 전혀 변경되지 않는가?
 
-이 Task는 격리 선행조건만 검증한다.
-Provider connection, model request, `Connect agent`, Streaming, Tool, Claude Code CCR request는 수행하지 않는다.
+이 Task는 격리 선행조건 하나만 검증한다.
+Provider 연결 재검사, model request, `Connect agent`, Streaming, Tool, CCR Claude Code 실행은 하지 않는다.
 
 ## Why this Task exists
 
 사내 복구에서 다음이 확인됐다.
 
 ```text
-Router stop 후에도 Enterprise Claude Code settings에 CCR Base URL이 잔존
+Router stop 후 Enterprise Claude Code settings에 CCR Base URL 잔존
 → 127.0.0.1:3456 token endpoint 오류
 
-Base URL 제거 후 CCR WIF/Federation 값이 잔존
+Base URL 제거 후 CCR WIF/Federation 값 잔존
 → federation_rule_id prefix 오류
 
-CCR Base URL + WIF/Federation 값을 제거
+CCR Base URL + WIF/Federation 값 제거
 → Enterprise 인증 정상 복귀
 
-%LOCALAPPDATA%\Claude-3p의 CCR third-party inference config 제거
+실제 %LOCALAPPDATA%\Claude-3p의 CCR third-party inference config 제거
 → 일반 Claude Desktop 정상 복귀
 ```
 
-Stock CCR source는:
+Source review도 다음을 확인했다.
 
-- `Only opened from CCR` profile에 별도 Claude Code settings와 `CLAUDE_CONFIG_DIR`을 사용한다.
-- management start/config save에서 Claude App Gateway sync를 호출할 수 있다.
-- Windows Claude App sync 기본 경로로 `%LOCALAPPDATA%\Claude-3p`를 사용한다.
+- `Only opened from CCR`는 Claude Code에 별도 settings와 `CLAUDE_CONFIG_DIR`을 사용한다.
+- management start/config save는 Claude App Gateway sync를 호출할 수 있다.
+- Windows Claude App sync 기본 경로는 `%LOCALAPPDATA%\Claude-3p`다.
 
-따라서 Provider Task를 재개하기 전에 runtime side effect를 실제 Enterprise 영역에서 격리할 수 있는지 증명해야 한다.
+따라서 Provider Task를 재개하기 전에 management/runtime side effect를 Enterprise 영역에서 격리할 수 있는지 증명해야 한다.
 
 ## Task classification
 
@@ -101,7 +101,7 @@ Mode:
 → validation-only two-ref exception
 ```
 
-## Enterprise invariant surfaces
+## Invariant and allowed surfaces
 
 ### Must remain unchanged
 
@@ -110,9 +110,8 @@ Mode:
 실제 %LOCALAPPDATA%\Claude-3p
 일반 claude command resolution
 Windows User/Machine CCR-managed environment values
-Enterprise Claude Code authentication smoke
-Enterprise Claude model list
-일반 Claude Desktop smoke
+Enterprise Claude Code authentication/model visibility
+일반 Claude Desktop 동작
 ```
 
 ### Allowed to change
@@ -121,12 +120,12 @@ Enterprise Claude model list
 %APPDATA%\claude-code-router\**
 %APPDATA%\CompanyCCR\runtime-localappdata\**
 CCR runtime database/config
-local recovery backup outside repository
+승인된 PC 로컬 recovery backup
 ```
 
 ## Managed environment keys
 
-비교 대상은 다음이다.
+사내 세션 안에서 before/after equality만 비교한다. 값 자체는 외부로 출력하지 않는다.
 
 ```text
 CLAUDE_CONFIG_DIR
@@ -153,22 +152,26 @@ CCR_CLAUDE_CODE_MCP_CONFIG
 CODEXL_CLAUDE_CODE_MCP_CONFIG
 ```
 
-값은 외부 Evidence에 출력하지 않는다.
-사내 세션 메모리에서 before/after equality만 비교한다.
+## Critical execution order
 
-## Actor plan
+Enterprise smoke는 정상 앱 실행 과정에서 settings/cache를 갱신할 수 있다.
+따라서 반드시 다음 순서를 사용한다.
 
-| Order | Actor | Responsibility |
-|---:|---|---|
-| 1 | `INTERNAL_VALIDATOR` | A1 exact candidate와 baseline fingerprint 준비 |
-| 2 | `HUMAN_GATE_OWNER` | H0 Enterprise baseline smoke와 로컬 비상 백업 |
-| 3 | `INTERNAL_VALIDATOR` | A2 sandbox service 시작 |
-| 4 | `HUMAN_GATE_OWNER` | H1 CCR UI에서 글로벌 프로필 제거·logging OFF 저장 |
-| 5 | `INTERNAL_VALIDATOR` | A3 before/during 비교, service stop, product diff |
-| 6 | `HUMAN_GATE_OWNER` | H2 Enterprise after smoke |
-| 7 | `INTERNAL_VALIDATOR` | A4 sanitized Evidence 반환 |
+```text
+A0 repository/service preflight
+→ H0 Enterprise smoke와 로컬 backup
+→ 모든 Claude Code/Claude Desktop process 종료
+→ A1 baseline fingerprint capture
+→ A2 sandbox CCR start
+→ H1 safe config cleanup/save
+→ A3 during/after fingerprint compare와 CCR stop
+→ H2 Enterprise after smoke
+→ A4 sanitized report
+```
 
-## A1 — [INTERNAL_VALIDATOR] Preflight and local fingerprints
+H0보다 먼저 fingerprint를 잡지 않는다.
+
+## A0 — [INTERNAL_VALIDATOR] Repository and service preflight
 
 ```powershell
 git fetch --prune origin
@@ -200,10 +203,39 @@ CLI exists = True
 CCR service stopped
 ```
 
-### Fingerprint helper
+CCR service가 실행 중이면 Task에 기록된 stock `stop`만 수행한 뒤 다시 확인한다.
+정상 종료가 되지 않으면 source/runtime DB를 수정하지 말고 중단한다.
 
-Fingerprint 원문과 hash는 외부로 출력하지 않는다.
-결과에는 `SAME / CHANGED / ABSENT`만 사용한다.
+## H0 — [HUMAN_GATE_OWNER] Enterprise smoke, backup, and quiesce
+
+CCR를 시작하기 전에 확인한다.
+
+```text
+Enterprise Claude Code authentication smoke: PASS
+Enterprise Claude models visible: PASS
+Claude Desktop normal smoke: PASS
+```
+
+그 뒤:
+
+1. Enterprise settings 원본을 승인된 PC 로컬 recovery 폴더에만 백업한다.
+2. 모든 Claude Code CLI/App 세션을 종료한다.
+3. Claude Desktop을 완전히 종료한다.
+4. 백업을 Git/repository/shared folder에 두지 않는다.
+
+Internal Validator에 반환:
+
+```text
+Enterprise CLI baseline: PASS / FAIL
+Enterprise model baseline: PASS / FAIL
+Claude Desktop baseline: PASS / FAIL
+Local recovery backup: CREATED / NOT_CREATED
+Claude clients closed: YES / NO
+```
+
+하나라도 FAIL이거나 client가 종료되지 않으면 `ENTERPRISE_BASELINE_FAILURE`로 중단한다.
+
+## A1 — [INTERNAL_VALIDATOR] Capture baseline after smoke and shutdown
 
 ```powershell
 $EnterpriseSettings = Join-Path $env:USERPROFILE ".claude\settings.json"
@@ -242,7 +274,6 @@ function Get-FileFingerprint([string]$Path) {
 
 function Get-TreeFingerprint([string]$Path) {
   if (-not (Test-Path $Path)) { return "ABSENT" }
-
   $Rows = Get-ChildItem -Path $Path -Recurse -File -ErrorAction Stop |
     Sort-Object FullName |
     ForEach-Object {
@@ -250,9 +281,7 @@ function Get-TreeFingerprint([string]$Path) {
       $Hash = (Get-FileHash -Algorithm SHA256 -Path $_.FullName).Hash
       "$Relative|$Hash"
     }
-
-  $Text = $Rows -join "`n"
-  $Bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+  $Bytes = [System.Text.Encoding]::UTF8.GetBytes(($Rows -join "`n"))
   $Sha = [System.Security.Cryptography.SHA256]::Create()
   try {
     return ([BitConverter]::ToString($Sha.ComputeHash($Bytes))).Replace("-", "")
@@ -275,49 +304,36 @@ function Get-EnvFingerprint([string]$Scope) {
   }
 }
 
+function Get-ClaudeResolutionFingerprint {
+  $Rows = @(
+    (where.exe claude 2>$null),
+    (Get-Command claude -All -ErrorAction SilentlyContinue |
+      ForEach-Object { "$($_.CommandType)|$($_.Source)|$($_.Path)" })
+  )
+  $Bytes = [System.Text.Encoding]::UTF8.GetBytes(($Rows -join "`n"))
+  $Sha = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([BitConverter]::ToString($Sha.ComputeHash($Bytes))).Replace("-", "")
+  } finally {
+    $Sha.Dispose()
+  }
+}
+
 $Baseline = [PSCustomObject]@{
   EnterpriseSettings = Get-FileFingerprint $EnterpriseSettings
   RealClaude3p       = Get-TreeFingerprint $RealClaude3p
   UserEnv            = Get-EnvFingerprint "User"
   MachineEnv         = Get-EnvFingerprint "Machine"
-  ClaudeResolution   = (where.exe claude 2>$null) -join "`n"
+  ClaudeResolution   = Get-ClaudeResolutionFingerprint
 }
 ```
 
-Fingerprint 수집이 잠긴 파일 등으로 실패하면 임의로 예외 처리하지 않고 `BLOCKED_BASELINE_CAPTURE`로 중단한다.
+Fingerprint 원문과 hash는 외부로 출력하지 않는다.
+잠긴 파일 등으로 수집이 실패하면 `BLOCKED_BASELINE_CAPTURE`로 중단한다.
 
-## H0 — [HUMAN_GATE_OWNER] Enterprise baseline confirmation
+## A2 — [INTERNAL_VALIDATOR] Start sandboxed management service
 
-CCR를 시작하기 전에 로컬에서 확인한다.
-
-```text
-Enterprise Claude Code authentication smoke: PASS
-Enterprise Claude models visible: PASS
-Claude Desktop normal smoke: PASS
-```
-
-권장 비상 백업:
-
-```text
-Enterprise settings 원본
-→ PC 로컬 recovery 폴더에만 복사
-→ Git/repository/shared folder 금지
-```
-
-Internal Validator에 반환:
-
-```text
-Enterprise CLI baseline: PASS / FAIL
-Enterprise model baseline: PASS / FAIL
-Claude Desktop baseline: PASS / FAIL
-Local recovery backup: CREATED / NOT_CREATED
-```
-
-하나라도 FAIL이면 `ENTERPRISE_BASELINE_FAILURE`로 중단한다.
-
-## A2 — [INTERNAL_VALIDATOR] Start management service with sandbox LOCALAPPDATA
-
-실제 User/Machine 환경변수를 변경하지 않는다.
+User/Machine 환경변수를 변경하지 않는다.
 현재 PowerShell process에서 daemon spawn 동안만 `LOCALAPPDATA`를 바꾼다.
 
 ```powershell
@@ -333,26 +349,26 @@ try {
 }
 
 $StartExit
+$ParentLocalAppDataRestored = $env:LOCALAPPDATA -eq $OriginalLocalAppData
+$ParentLocalAppDataRestored
 ```
 
 기대 결과:
 
 ```text
 StartExit = 0
-현재 PowerShell LOCALAPPDATA = 원래 값
+ParentLocalAppDataRestored = True
 ```
 
 Management URL/token은 사내 PC 안에서만 사용한다.
-외부 Evidence에 복사하지 않는다.
-
 `StartExit != 0`이면 `RUNTIME_SANDBOX_INCOMPATIBLE`로 중단한다.
 
-## H1 — [HUMAN_GATE_OWNER] Remove global profile side effects and save safely
+## H1 — [HUMAN_GATE_OWNER] Remove global profile side effects and save
 
 로컬 Management UI에서 수행한다.
 
-1. Agent Profiles에 활성 `System default` / global Claude Code profile이 있으면 제거하거나 비활성화한다.
-2. 이 Task에서는 새로운 Claude Code profile을 만들지 않는다.
+1. 활성 `System default` / global Claude Code profile을 모두 제거하거나 비활성화한다.
+2. 이 Task에서는 새 Claude Code profile을 만들지 않는다.
 3. `Request logs`를 OFF로 둔다.
 4. `Agent observability`를 OFF로 둔다.
 5. Provider endpoint/key/model/protocol은 수정하지 않는다.
@@ -371,20 +387,24 @@ Connect agent executed: NO
 Let's start executed: NO
 ```
 
-글로벌 프로필을 제거할 수 없거나 저장에 source/runtime DB 직접 편집이 필요하면 중단한다.
+글로벌 프로필을 제거할 수 없거나 source/runtime DB 직접 편집이 필요하면 중단한다.
 
-## A3 — [INTERNAL_VALIDATOR] Verify isolation, stop, and repository cleanliness
+## A3 — [INTERNAL_VALIDATOR] Compare during, stop, and compare after
 
-### During-service comparison
+Claude Code와 Claude Desktop은 이 비교가 끝날 때까지 실행하지 않는다.
 
 ```powershell
-$During = [PSCustomObject]@{
-  EnterpriseSettings = Get-FileFingerprint $EnterpriseSettings
-  RealClaude3p       = Get-TreeFingerprint $RealClaude3p
-  UserEnv            = Get-EnvFingerprint "User"
-  MachineEnv         = Get-EnvFingerprint "Machine"
-  ClaudeResolution   = (where.exe claude 2>$null) -join "`n"
+function Get-CurrentInvariantState {
+  [PSCustomObject]@{
+    EnterpriseSettings = Get-FileFingerprint $EnterpriseSettings
+    RealClaude3p       = Get-TreeFingerprint $RealClaude3p
+    UserEnv            = Get-EnvFingerprint "User"
+    MachineEnv         = Get-EnvFingerprint "Machine"
+    ClaudeResolution   = Get-ClaudeResolutionFingerprint
+  }
 }
+
+$During = Get-CurrentInvariantState
 
 $SettingsDuringSame = $Baseline.EnterpriseSettings -eq $During.EnterpriseSettings
 $Claude3pDuringSame = $Baseline.RealClaude3p -eq $During.RealClaude3p
@@ -392,37 +412,11 @@ $UserEnvDuringSame = $Baseline.UserEnv -eq $During.UserEnv
 $MachineEnvDuringSame = $Baseline.MachineEnv -eq $During.MachineEnv
 $ClaudeResolutionDuringSame = $Baseline.ClaudeResolution -eq $During.ClaudeResolution
 $SandboxClaude3pExists = Test-Path (Join-Path $SandboxLocalAppData "Claude-3p")
-```
 
-기대 결과:
-
-```text
-Enterprise settings SAME
-Real Claude-3p SAME
-User env SAME
-Machine env SAME
-claude resolution SAME
-Sandbox Claude-3p exists TRUE
-```
-
-### Stop
-
-```powershell
 node $Cli stop
 $StopExit = $LASTEXITCODE
-$StopExit
-```
 
-### After-stop comparison
-
-```powershell
-$After = [PSCustomObject]@{
-  EnterpriseSettings = Get-FileFingerprint $EnterpriseSettings
-  RealClaude3p       = Get-TreeFingerprint $RealClaude3p
-  UserEnv            = Get-EnvFingerprint "User"
-  MachineEnv         = Get-EnvFingerprint "Machine"
-  ClaudeResolution   = (where.exe claude 2>$null) -join "`n"
-}
+$After = Get-CurrentInvariantState
 
 $SettingsAfterSame = $Baseline.EnterpriseSettings -eq $After.EnterpriseSettings
 $Claude3pAfterSame = $Baseline.RealClaude3p -eq $After.RealClaude3p
@@ -435,9 +429,25 @@ $ProductDiffExit = $LASTEXITCODE
 git status --short
 ```
 
-Fingerprint 값 자체는 출력하지 않고 Boolean/equality만 보고한다.
+기대 결과:
+
+```text
+Enterprise settings during/after = SAME
+actual Claude-3p during/after = SAME
+User env during/after = SAME
+Machine env during/after = SAME
+normal claude resolution during/after = SAME
+sandbox Claude-3p exists = TRUE
+StopExit = 0
+ProductDiffExit = 0
+final git status = clean
+```
+
+Boolean/equality만 보고하고 fingerprint 값은 출력하지 않는다.
 
 ## H2 — [HUMAN_GATE_OWNER] Enterprise after smoke
+
+A3 fingerprint 비교가 끝난 뒤 정상 경로로 확인한다.
 
 ```text
 Enterprise Claude Code authentication smoke: PASS
@@ -455,6 +465,8 @@ Manual settings/env recovery required: NO
 - [ ] working tree before test clean
 - [ ] Enterprise baseline smoke PASS
 - [ ] local recovery backup 상태 기록
+- [ ] all Claude clients closed before fingerprint
+- [ ] baseline captured after smoke and shutdown
 - [ ] service starts with process-local sandbox `LOCALAPPDATA`
 - [ ] parent PowerShell `LOCALAPPDATA` restored immediately
 - [ ] enabled global Claude Code profiles after save = `0`
@@ -484,28 +496,29 @@ PASS
 → Human Gate may reactivate V1-S1-T01
 
 FAIL — ISOLATION_BREACH
-→ actual Enterprise settings/env/Claude-3p/command changed
+→ Enterprise settings/env/Claude-3p/command changed
 → Human restores local baseline
-→ External Codex repair or explicit Core sync-disable Task required
+→ External Codex repair or explicit sync-disable Task required
 
 FAIL — RUNTIME_SANDBOX_INCOMPATIBLE
 → Stock CCR cannot operate correctly with process-local LOCALAPPDATA
 → evaluate minimal explicit Claude App sync-disable patch
 
 BLOCKED
-→ Enterprise baseline, fingerprint capture, policy or host precondition unavailable
+→ baseline, fingerprint, policy or host precondition unavailable
 ```
 
 ## Stop conditions
 
-- CCR service was not stopped before baseline
+- CCR service cannot be stopped before baseline
 - working tree dirty
 - Enterprise baseline smoke FAIL
+- Claude clients cannot be closed
 - fingerprint capture unavailable
 - User/Machine env must be edited to continue
-- source or runtime DB direct edit required
-- actual Enterprise invariant changes
-- actual secret/raw settings must be exported to diagnose
+- source/runtime DB direct edit required
+- Enterprise invariant changes
+- secret/raw settings must be exported to diagnose
 - model request would be required
 
 ## Failure classification
@@ -531,17 +544,21 @@ Instruction SHA:
 Candidate SHA:
 Environment alias:
 
-A1:
+A0:
 - candidate match:
 - working tree clean:
 - CLI exists:
-- baseline fingerprint capture:
+- CCR service stopped:
 
 H0:
 - Enterprise CLI baseline:
 - Enterprise model baseline:
 - Claude Desktop baseline:
 - local recovery backup:
+- Claude clients closed:
+
+A1:
+- baseline captured after smoke/shutdown:
 
 A2:
 - sandbox service start:
