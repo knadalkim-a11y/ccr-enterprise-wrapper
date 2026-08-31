@@ -77,6 +77,59 @@ Claude Code E2E는 추가로 `CLAUDE_CODE_EXECUTION_ALLOWED`가 있는 host에�
 
 부분 성공 UX가 혼동을 일으킬 수 있지만 현재 V1에서는 Core patch보다 Company-managed Chat-only config를 우선한다.
 
+## TRAP-005 — Router stop을 Claude Code Enterprise 설정 rollback으로 간주하지 말 것
+
+- Status: `ACTIVE`
+- Scope: Claude Code global/System-default profile and Enterprise auth
+- Applies to: CCR `v3.0.22`, internal Windows
+- Symptom 1: Router stop 후 Claude Code가 `127.0.0.1:3456` token endpoint를 계속 호출함
+- Symptom 2: Base URL 제거 후 `federation_rule_id does not have prefix 'fdrl_'` 오류가 발생함
+- Confirmed residual settings:
+  - `ANTHROPIC_BASE_URL`
+  - `ANTHROPIC_API_BASE_URL`
+  - `CLAUDE_AGENT_API_BASE_URL`
+  - `ANTHROPIC_FEDERATION_RULE_ID = ccr-local`
+  - `ANTHROPIC_IDENTITY_TOKEN_FILE = CCR-managed file`
+  - `ANTHROPIC_ORGANIZATION_ID = ccr-local`
+- Code basis: CCR global profile apply는 Gateway URL, WIF/Federation, model/helper/MCP 값을 Claude Code settings에 기록할 수 있음
+- Root cause: global/System-default client config가 Router lifecycle과 독립적으로 persistent storage에 남을 수 있음; 해당 실행에서 자동 restore가 Enterprise 상태를 보장하지 못함
+- Avoid:
+  - V1에서 `System default` 금지
+  - `Only opened from CCR` + CLI-only 사용
+  - Enterprise baseline before/during/after equality 검사
+- Detect: 기본 `%USERPROFILE%\.claude\settings.json`에 CCR-managed Base URL/WIF/model/helper marker 존재
+- Classification: `CLIENT_AUTH_CONFIG_PERSISTENCE`, `ROLLBACK_GAP`, `ISOLATION_BREACH`
+- Recovery: Human Gate Owner가 승인된 로컬 backup 또는 알려진 Enterprise baseline으로 복구함; Internal Validator가 runtime DB/source를 수정하지 않음
+- Evidence: V1-S1-T01 recovery observation; `packages/core/src/profiles/service.ts`
+- Recheck when: isolated profile/stop repeatability Task가 통과하거나 upstream global restore logic이 변경됨
+
+수동 복구에 성공해도 해당 isolation Task는 PASS가 아니다.
+정상 lifecycle은 rollback이 필요 없어야 한다.
+
+## TRAP-006 — `Only opened from CCR`만으로 실제 Claude-3p side effect가 격리된다고 가정하지 말 것
+
+- Status: `ACTIVE`
+- Scope: CCR management/config save and Claude Desktop third-party inference configuration
+- Applies to: CCR `v3.0.22`, Windows
+- Symptom: 일반 Claude Desktop이 CCR local model만 표시하거나 CCR service 종료 후 정상 모델로 자동 복귀하지 않음
+- Confirmed recovery: `%LOCALAPPDATA%\Claude-3p`의 CCR third-party inference config를 제거하자 일반 Claude Desktop 정상 복귀
+- Code behavior:
+  - management startup/config save는 `syncClaudeAppGatewayConfig`를 호출할 수 있음
+  - Windows default target은 `%LOCALAPPDATA%\Claude-3p`
+  - `start --no-gateway`라도 UI save는 sync path를 호출할 수 있음
+- Root cause: Claude Code profile scope와 Claude App Gateway sync는 별도 메커니즘임
+- Avoid:
+  - CCR service/admin process를 process-local sandbox `LOCALAPPDATA`로 실행
+  - actual Claude-3p before/during/after fingerprint equality 확인
+  - CLI-only scope에서 Claude App/Desktop 연결 금지
+- Detect: actual Claude-3p fingerprint 변경 또는 일반 Claude Desktop 모델/인증 변경
+- Classification: `CLAUDE_APP_CONFIG_PERSISTENCE`, `ISOLATION_BREACH`
+- Recovery: Human Gate Owner가 local backup/known baseline으로 복구함
+- Evidence: V1-S1 recovery observation; `packages/core/src/agents/claude-app/gateway-service.ts`; `packages/core/src/web/management-server.ts`
+- Recheck when: `V1-S1-T00` sandbox가 통과하거나 explicit Claude App sync-disable option이 구현됨
+
+`Only opened from CCR`는 Claude Code settings 격리에 유효하지만 전체 CCR Runtime side effect 격리를 의미하지 않는다.
+
 ## Template
 
 ```markdown
