@@ -24,9 +24,10 @@
 - T02: `EXTERNAL_PASS` — wrapper-only helper syntax PASS, synthetic/mock tests 159/159
 - Repair scope: `company/** only`; CCR `packages/**` prohibited
 - T00 Attempt 1: `BLOCKED — GLOBAL_PROFILE_PERSISTENCE`
-- T00 Attempt 2: `NOT_STARTED`; exact frozen-head A0 only authorized
+- T00 Attempt 2: `BLOCKED — BLOCKED_TOOLCHAIN_IDENTITY` at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910`; exact checkpoint not captured; console closed
+- T00 Attempt 3: `NOT_STARTED`; new exact frozen-head A0 only authorized
 - Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
-- Goal: exact frozen PR head에서 A0 preflight부터 다시 시작해 Company-owned helper의 management/config-save isolation을 검증
+- Goal: sanitized phase/tool/reason diagnostics가 포함된 새 exact frozen PR head에서 A0 preflight부터 다시 시작
 - Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
 
@@ -217,6 +218,8 @@ local recovery backup outside repository
 ## Current open risks
 
 - Management start isolation passed one Windows Attempt, but the wrapper-assisted config-save isolation has not run internally.
+- Attempt 2의 A0 toolchain identity capsule은 exact phase/tool/reason을 보존하지 않아 원인을 확정할 수 없다. Post-block diagnostic은 실행되지 않았고 session console은 닫혔다. `npm.ps1` precedence는 Application-only binding으로 배제되지만 정확한 원인은 여전히 unknown이며 stale state를 재사용하지 않는다.
+- Attempt 3 instruction은 toolchain identity failure를 raw path/hash/error 없이 fixed `PHASE/TOOL/REASON` allowlist로 반환하도록 보완됐지만 아직 Windows에서 실행되지 않았다.
 - Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
 - Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
 - Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
@@ -260,12 +263,13 @@ local recovery backup outside repository
 
 ## Exact next action
 
-T02 External PASS와 Human continuation approval이 기록됐다. 현재 승인 범위는 다음뿐이다.
+T02 External PASS, Attempt 2 A0 block와 Human docs-only diagnostic repair approval이
+기록됐다. 현재 승인 범위는 다음뿐이다.
 
 ```text
-1. final repair PR head 하나를 동결
+1. A0 sanitized toolchain diagnostic repair를 포함한 final repair PR head 하나를 동결
 2. Human Gate가 그 exact 40-char SHA를 candidate SHA이자 instruction SHA로 승인
-3. Internal Validator가 전용 64-bit PowerShell console에서 T00 Attempt 2 A0만 수행
+3. Internal Validator가 새 전용 interactive 64-bit PowerShell console에서 T00 Attempt 3 A0만 수행
 4. compact sanitized A0 capsule만 반환하고 같은 console을 열어 둔 채 중단
 5. CHATGPT_ORCHESTRATOR와 Human Gate가 A0 Evidence를 검토
 ```

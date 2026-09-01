@@ -53,7 +53,7 @@ Date: 2026-09-01
 Authority: HUMAN_GATE_OWNER
 Decision: APPROVED_FOR_IMPLEMENTATION
 CCR packages/** changes: PROHIBITED
-T00 Attempt 2: NOT_STARTED
+T00 Attempt 2 at activation: NOT_STARTED
 T01: BLOCKED
 ```
 
@@ -67,7 +67,7 @@ Standalone production safety claim: PROHIBITED
 Fresh A2 spawn + quiescence + unconditional A3: REQUIRED
 ```
 
-The final Human decision remains pending until External PASS, exact-head T00 Attempt 2, and Human Gate review.
+The final Human decision remains pending until External PASS, exact-head T00 Attempt 3, and Human Gate review. Attempt 2 stopped at A0 with `BLOCKED_TOOLCHAIN_IDENTITY`; the helper itself remains internally unexecuted.
 
 ## Validation question
 
@@ -150,7 +150,7 @@ T00 A0/A2가 absent state에서 같은 PowerShell이 sandbox `LOCALAPPDATA`로 f
 - Loopback-only authenticated Management RPC.
 - Fail-closed preflight and exact allowlisted config transform.
 - Compact sanitized output for the keyboard-only Evidence boundary.
-- Exact repair PR head handoff to T00 Attempt 2.
+- Exact repair PR head handoff to T00 Attempt 3 after Attempt 2 A0 diagnostic repair.
 
 Role-owned canonical transition after External PASS:
 
@@ -354,7 +354,7 @@ They must cover:
 - [ ] no forbidden or explicit Gateway-control RPC invoked
 - [ ] synthetic/mock tests pass
 - [ ] compact sanitized output only
-- [ ] T00 Attempt 2 is the only internal runtime validation
+- [ ] T00 Attempt 3 is the only newly authorized internal validation; A0 only until Gate review
 - [ ] T01 remains blocked
 
 ## Stop conditions
@@ -383,7 +383,9 @@ They must cover:
 `merge_policy: internal_pass_required`.
 
 After External PASS, Human Gate supplies the exact PR head as candidate/instruction SHA.
-T00 Attempt 2 runs on that exact head.
+T00 Attempt 2 stopped at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910` with
+`BLOCKED_TOOLCHAIN_IDENTITY`; no helper/runtime service execution occurred. A docs-only
+sanitized diagnostic repair is followed by T00 Attempt 3 on the new exact head.
 The repair PR must not merge before T00 PASS and Human decision.
 
 ## Sanitized evidence template
@@ -413,18 +415,20 @@ Next Task started: NO
 
 | Attempt | Actor / session role | Candidate | Instruction | External | Internal | Recommendation |
 |---:|---|---|---|---|---|---|
-| 1 | EXTERNAL_CODEX / wrapper-only implementation | final repair PR head supplied by Human Gate | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, product tree equivalence | `NOT_STARTED` | `READY_FOR_INTERNAL_VALIDATION` — freeze exact head and run T00 Attempt 2 A0 only |
+| 1 | EXTERNAL_CODEX / wrapper-only implementation | final repair PR head supplied by Human Gate | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, product tree equivalence | helper runtime `NOT_STARTED`; T00 Attempt 2 A0 `BLOCKED_TOOLCHAIN_IDENTITY` before service start | `READY_FOR_INTERNAL_VALIDATION` — freeze new exact head and run T00 Attempt 3 A0 only |
 
 ## Evidence / limitations
 
-T00 Attempt 1 is the only internal runtime Evidence so far.
+T00 Attempt 1 remains the only internal service/runtime execution Evidence so far.
+Attempt 2 added only an A0 `BLOCKED_TOOLCHAIN_IDENTITY` capsule; exact checkpoint was
+not captured, post-block diagnostic was not run, and its console is closed.
 Human Gate activated this Task on `2026-09-01`; implementation and synthetic tests passed only within the declared paths.
 The helper remains validation-only and has not run against internal runtime data.
 The pinned Management RPC dependency must be revalidated on every upstream update.
 
 ## Agent recommendation
 
-`READY_FOR_INTERNAL_VALIDATION — FREEZE EXACT HEAD; RUN T00 ATTEMPT 2 A0 ONLY`
+`READY_FOR_INTERNAL_VALIDATION — FREEZE NEW EXACT HEAD; RUN T00 ATTEMPT 3 A0 ONLY`
 
 ## Human decision
 

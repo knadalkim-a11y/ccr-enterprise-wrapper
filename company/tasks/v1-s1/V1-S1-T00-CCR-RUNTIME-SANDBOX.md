@@ -242,35 +242,114 @@ if (-not [Environment]::Is64BitOperatingSystem -or
   throw "BLOCKED_WINDOWS_RUNTIME"
 }
 
-function Get-T00BoundCommand([string]$Name) {
-  $Command = Get-Command $Name -CommandType Application -ErrorAction Stop
-  $Item = Get-Item -LiteralPath $Command.Path -Force -ErrorAction Stop
-  if (($Item -isnot [IO.FileInfo]) -or
-      (($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
-    throw "BLOCKED_TOOLCHAIN_IDENTITY"
+function Stop-T00ToolchainIdentity(
+  [string]$Phase,
+  [string]$Tool,
+  [string]$Reason
+) {
+  throw "BLOCKED_TOOLCHAIN_IDENTITY|PHASE=$Phase|TOOL=$Tool|REASON=$Reason"
+}
+
+function Get-T00BoundCommand(
+  [string]$Name,
+  [string]$Phase,
+  [string]$Tool
+) {
+  try {
+    $Commands = @(Get-Command $Name -CommandType Application -ErrorAction Stop)
+  } catch {
+    Stop-T00ToolchainIdentity $Phase $Tool "UNRESOLVED"
+  }
+  if ($Commands.Count -eq 0) {
+    Stop-T00ToolchainIdentity $Phase $Tool "UNRESOLVED"
+  }
+  if ($Commands.Count -ne 1) {
+    Stop-T00ToolchainIdentity $Phase $Tool "MULTI"
+  }
+  $CommandPath = [string]$Commands[0].Path
+  if ([string]::IsNullOrWhiteSpace($CommandPath)) {
+    Stop-T00ToolchainIdentity $Phase $Tool "NO_PATH"
+  }
+  try {
+    $Item = Get-Item -LiteralPath $CommandPath -Force -ErrorAction Stop
+  } catch {
+    Stop-T00ToolchainIdentity $Phase $Tool "UNREADABLE"
+  }
+  if ($Item -isnot [IO.FileInfo]) {
+    Stop-T00ToolchainIdentity $Phase $Tool "NOT_FILE"
+  }
+  if (($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    Stop-T00ToolchainIdentity $Phase $Tool "REPARSE"
+  }
+  try {
+    $Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Item.FullName -ErrorAction Stop).Hash
+  } catch {
+    Stop-T00ToolchainIdentity $Phase $Tool "HASH_UNREADABLE"
+  }
+  if ($Hash -cnotmatch '^[0-9A-F]{64}$') {
+    Stop-T00ToolchainIdentity $Phase $Tool "HASH_UNREADABLE"
   }
   return [PSCustomObject]@{
-    Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Item.FullName -ErrorAction Stop).Hash
+    Hash = $Hash
     Path = $Item.FullName
   }
 }
 
-function Test-T00BoundCommand($BoundCommand) {
+function Get-T00BoundCommandStatus($BoundCommand) {
+  if ($null -eq $BoundCommand) {
+    return "INVALID_BOUND"
+  }
+  $Paths = @($BoundCommand.Path)
+  $Hashes = @($BoundCommand.Hash)
+  if ($Paths.Count -ne 1 -or
+      $Hashes.Count -ne 1 -or
+      [string]::IsNullOrWhiteSpace([string]$Paths[0]) -or
+      ([string]$Hashes[0]) -cnotmatch '^[0-9A-F]{64}$') {
+    return "INVALID_BOUND"
+  }
   try {
-    $Item = Get-Item -LiteralPath $BoundCommand.Path -Force -ErrorAction Stop
-    return (
-      $Item -is [IO.FileInfo] -and
-      (($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) -and
-      (Get-FileHash -Algorithm SHA256 -LiteralPath $Item.FullName -ErrorAction Stop).Hash -ceq $BoundCommand.Hash
-    )
+    $Item = Get-Item -LiteralPath ([string]$Paths[0]) -Force -ErrorAction Stop
   } catch {
-    return $false
+    return "UNREADABLE"
+  }
+  if ($Item -isnot [IO.FileInfo]) {
+    return "NOT_FILE"
+  }
+  if (($Item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    return "REPARSE"
+  }
+  try {
+    $CurrentHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Item.FullName -ErrorAction Stop).Hash
+  } catch {
+    return "HASH_UNREADABLE"
+  }
+  if ($CurrentHash -cnotmatch '^[0-9A-F]{64}$') {
+    return "HASH_UNREADABLE"
+  }
+  if ($CurrentHash -cne [string]$Hashes[0]) {
+    return "HASH_MISMATCH"
+  }
+  return "MATCH"
+}
+
+function Test-T00BoundCommand($BoundCommand) {
+  return (Get-T00BoundCommandStatus $BoundCommand) -ceq "MATCH"
+}
+
+function Assert-T00BoundCommand(
+  $BoundCommand,
+  [string]$Phase,
+  [string]$Tool
+) {
+  $Reason = Get-T00BoundCommandStatus $BoundCommand
+  if ($Reason -cne "MATCH") {
+    Stop-T00ToolchainIdentity $Phase $Tool $Reason
   }
 }
 
-$GitTool = Get-T00BoundCommand "git"
-$NodeTool = Get-T00BoundCommand "node"
-$NpmTool = Get-T00BoundCommand "npm"
+$GitTool = Get-T00BoundCommand "git" "BIND" "GIT"
+$NodeTool = Get-T00BoundCommand "node" "BIND" "NODE"
+$NpmTool = Get-T00BoundCommand "npm" "BIND" "NPM"
 $GitExe = $GitTool.Path
 $NodeExe = $NodeTool.Path
 $NpmExe = $NpmTool.Path
@@ -503,11 +582,9 @@ if (($WhereItem -isnot [IO.FileInfo]) -or
 }
 $WhereItem = $null
 
-if (-not (Test-T00BoundCommand $GitTool) -or
-    -not (Test-T00BoundCommand $NodeTool) -or
-    -not (Test-T00BoundCommand $NpmTool)) {
-  throw "BLOCKED_TOOLCHAIN_IDENTITY"
-}
+Assert-T00BoundCommand $GitTool "PRE_FIRST_NODE" "GIT"
+Assert-T00BoundCommand $NodeTool "PRE_FIRST_NODE" "NODE"
+Assert-T00BoundCommand $NpmTool "PRE_FIRST_NODE" "NPM"
 
 $ServiceStateFile = Join-Path $env:APPDATA "claude-code-router\service.json"
 $ClaudeAppBackupFile = Join-Path $env:APPDATA "claude-code-router\claude-app-gateway-backup.json"
@@ -811,10 +888,8 @@ try {
     )
   }
 
-  if (-not (Test-T00BoundCommand $NodeTool) -or
-      -not (Test-T00BoundCommand $NpmTool)) {
-    throw "BLOCKED_TOOLCHAIN_IDENTITY"
-  }
+  Assert-T00BoundCommand $NodeTool "BUILD_ENTRY" "NODE"
+  Assert-T00BoundCommand $NpmTool "BUILD_ENTRY" "NPM"
   $NpmNodeOptionsRaw = @(& $NpmExe --loglevel=silent config get node-options 2>&1)
   $NpmNodeOptionsExit = $LASTEXITCODE
   $NpmScriptShellRaw = @(& $NpmExe --loglevel=silent config get script-shell 2>&1)
@@ -856,9 +931,7 @@ try {
     throw "BLOCKED_DEPENDENCY_INSTALL"
   }
 
-  if (-not (Test-T00BoundCommand $NodeTool)) {
-    throw "BLOCKED_TOOLCHAIN_IDENTITY"
-  }
+  Assert-T00BoundCommand $NodeTool "POST_INSTALL" "NODE"
   $TypeScriptCli = Join-Path $ExecutionRoot "node_modules\typescript\bin\tsc"
   try {
     $TypecheckRaw = @(& $NodeExe $TypeScriptCli --noEmit 2>&1)
@@ -872,9 +945,7 @@ try {
     throw "BLOCKED_TYPECHECK"
   }
 
-  if (-not (Test-T00BoundCommand $NodeTool)) {
-    throw "BLOCKED_TOOLCHAIN_IDENTITY"
-  }
+  Assert-T00BoundCommand $NodeTool "PRE_BUILD" "NODE"
   try {
     $BuildRaw = @(& $NodeExe build/build.mjs 2>&1)
     $BuildAssetsExit = $LASTEXITCODE
@@ -902,11 +973,9 @@ try {
   Pop-Location
 }
 
-if (-not (Test-T00BoundCommand $GitTool) -or
-    -not (Test-T00BoundCommand $NodeTool) -or
-    -not (Test-T00BoundCommand $NpmTool)) {
-  throw "BLOCKED_TOOLCHAIN_IDENTITY"
-}
+Assert-T00BoundCommand $GitTool "POST_BUILD" "GIT"
+Assert-T00BoundCommand $NodeTool "POST_BUILD" "NODE"
+Assert-T00BoundCommand $NpmTool "POST_BUILD" "NPM"
 
 Assert-T00ExecutionTreeRegular $ExecutionRoot
 $ExactTreePathsAfterBuild = @(Get-T00ExactSourcePaths)
@@ -1048,7 +1117,6 @@ $A0PassCapsule
 } catch {
   $AllowedA0Categories = @(
     "BLOCKED_CANDIDATE_CONTRACT",
-    "BLOCKED_TOOLCHAIN_IDENTITY",
     "BLOCKED_REPOSITORY_ROOT",
     "BLOCKED_GIT_FETCH",
     "BLOCKED_DIRTY_WORKTREE",
@@ -1070,16 +1138,64 @@ $A0PassCapsule
     "BLOCKED_BUILD_TREE_MUTATION"
   )
   $A0FailureMessage = [string]$_.Exception.Message
-  $A0FailureCategory = if ($AllowedA0Categories -ccontains $A0FailureMessage) {
-    $A0FailureMessage
-  } else {
-    "BLOCKED_A0_PREFLIGHT"
+  $A0ToolchainFailurePattern = (
+    '^BLOCKED_TOOLCHAIN_IDENTITY\|' +
+    'PHASE=(?<PHASE>BIND|PRE_FIRST_NODE|BUILD_ENTRY|POST_INSTALL|PRE_BUILD|POST_BUILD)\|' +
+    'TOOL=(?<TOOL>GIT|NODE|NPM)\|' +
+    'REASON=(?<REASON>UNRESOLVED|MULTI|NO_PATH|UNREADABLE|NOT_FILE|REPARSE|HASH_UNREADABLE|INVALID_BOUND|HASH_MISMATCH)$'
+  )
+  $A0AllowedToolchainContexts = @{
+    "BIND" = @("GIT", "NODE", "NPM")
+    "PRE_FIRST_NODE" = @("GIT", "NODE", "NPM")
+    "BUILD_ENTRY" = @("NODE", "NPM")
+    "POST_INSTALL" = @("NODE")
+    "PRE_BUILD" = @("NODE")
+    "POST_BUILD" = @("GIT", "NODE", "NPM")
   }
-  "A0|RESULT=BLOCKED|CATEGORY=$A0FailureCategory|RAW=NO"
+  $A0ToolchainFailureMatched = $A0FailureMessage -cmatch $A0ToolchainFailurePattern
+  if ($A0ToolchainFailureMatched) {
+    $A0FailurePhase = [string]$Matches["PHASE"]
+    $A0FailureTool = [string]$Matches["TOOL"]
+    $A0FailureReason = [string]$Matches["REASON"]
+  }
+  $A0ToolchainContextAllowed = (
+    $A0ToolchainFailureMatched -and
+    $A0AllowedToolchainContexts.ContainsKey($A0FailurePhase) -and
+    $A0AllowedToolchainContexts[$A0FailurePhase] -ccontains $A0FailureTool
+  )
+  if ($A0ToolchainContextAllowed) {
+    (
+      "A0|RESULT=BLOCKED|CATEGORY=BLOCKED_TOOLCHAIN_IDENTITY|" +
+      "PHASE=$A0FailurePhase|TOOL=$A0FailureTool|" +
+      "REASON=$A0FailureReason|RAW=NO"
+    )
+  } else {
+    $A0FailureCategory = if ($AllowedA0Categories -ccontains $A0FailureMessage) {
+      $A0FailureMessage
+    } else {
+      "BLOCKED_A0_PREFLIGHT"
+    }
+    "A0|RESULT=BLOCKED|CATEGORY=$A0FailureCategory|RAW=NO"
+  }
 }
 }
 $T00A0Outcome
 ```
+
+`BLOCKED_TOOLCHAIN_IDENTITY`이면 A0은 원문 오류, executable 경로 또는 hash를
+출력하지 않고 다음 고정 allowlist만 추가한다.
+
+```text
+PHASE = BIND | PRE_FIRST_NODE | BUILD_ENTRY | POST_INSTALL | PRE_BUILD | POST_BUILD
+TOOL = GIT | NODE | NPM
+REASON = UNRESOLVED | MULTI | NO_PATH | UNREADABLE | NOT_FILE | REPARSE |
+         HASH_UNREADABLE | INVALID_BOUND | HASH_MISMATCH
+```
+
+명령 binding은 PowerShell default precedence가 아니라 `Application` command type만
+대상으로 한다. 따라서 같은 이름의 script가 먼저 보이는지 추측하거나 경로를
+외부로 옮길 필요가 없다. 위 구조화 capsule이 없는 이전 Attempt의 정확한
+실패 지점은 사후 추정하지 않는다.
 
 진행 조건:
 
@@ -2257,11 +2373,12 @@ Fingerprint/hash/PID/path/URL/token/config 원문을 출력하지 않고 아래 
 낮은 우선순위의 helper category가 isolation breach나 shutdown failure를 가리지 않는다.
 `SAVE=UNKNOWN`은 절대 retry하지 않으며 cleanup이 성공해도 해당 Attempt는 FAIL이다.
 
-## Acceptance criteria — Attempt 2
+## Acceptance criteria — Attempt 3
 
 - [ ] exact instruction SHA 기록
 - [ ] exact candidate SHA 기록
 - [ ] candidate/instruction/final PR head 동일
+- [ ] toolchain identity block이면 fixed `PHASE/TOOL/REASON` capsule만 출력
 - [ ] same dedicated 64-bit PowerShell process retained from A0 through A2–A3
 - [ ] working tree before test clean
 - [ ] product tree equivalence exit `0`
@@ -2358,6 +2475,7 @@ BLOCKED — BLOCKED_FRESH_SERVICE_STATE
 
 - CCR service cannot be stopped before baseline
 - working tree dirty
+- Git/Node/npm Application identity cannot be bound or changes during A0
 - forbidden Node/runtime/Gateway override environment present
 - exact checked-out source cannot rebuild CLI assets
 - Enterprise baseline smoke FAIL
@@ -2374,6 +2492,7 @@ BLOCKED — BLOCKED_FRESH_SERVICE_STATE
 ## Failure classification
 
 - `BLOCKED_BASELINE_CAPTURE`
+- `BLOCKED_TOOLCHAIN_IDENTITY`
 - `BLOCKED_RUNTIME_ENV`
 - `BLOCKED_BUILD_ASSETS`
 - `ENTERPRISE_BASELINE_FAILURE`
@@ -2411,6 +2530,7 @@ A0:
 - CCR service state absent:
 - service state absent before start:
 - same persistent PowerShell console retained: YES / NO
+- toolchain identity capsule, if blocked: fixed `PHASE/TOOL/REASON` only
 
 H0:
 - Enterprise CLI baseline:
@@ -2601,14 +2721,54 @@ The activated Company-only repair is Task `V1-S1-T02`:
 9. Require the Gateway to remain `STOP` before/after, then re-read and verify enabled global Claude Code profiles `0`, logging/analysis/body capture unchanged and Provider-related configuration unchanged.
 10. Output only a compact sanitized PASS/BLOCKED/FAIL capsule; leave service stop and A3/H2 to T00.
 
-T02 was separately activated by Human Gate on `2026-09-01` and is now `EXTERNAL_PASS` with 159/159 synthetic/mock tests. T00 Attempt 2 is `READY_FOR_INTERNAL_VALIDATION` on the exact final frozen PR head. The only authorized first step is A0; H0 and A1+ remain unauthorized until sanitized A0 Evidence is reviewed. T01 remains blocked until T00 Human decision `ACCEPTED`.
+T02 was separately activated by Human Gate on `2026-09-01` and is now
+`EXTERNAL_PASS` with 159/159 synthetic/mock tests.
+
+## Attempt 2 Evidence — sanitized
+
+- Date: `2026-09-01`
+- Candidate / instruction SHA: `c2459b90182041afdb7b9c0cf44149494b30f910`
+- A0 result: `BLOCKED — BLOCKED_TOOLCHAIN_IDENTITY`
+- Exact failed phase/tool/reason: `UNKNOWN — NOT_CAPTURED_BY_ATTEMPT_2_CAPSULE`
+- Post-block diagnostic: `NOT_RUN — NOT_APPROVED`
+- Dedicated session console: `CLOSED — PARTIAL_STATE_NOT_REUSABLE`
+
+Sanitized operator evidence confirms that the approved A0 performed the exact-candidate
+read-only context load, fetch, detached checkout, archive, dependency install,
+typecheck and build. The one-line failure capsule did not identify which identity
+checkpoint failed. `npm.ps1` precedence is excluded by the A0 Application-only binding
+and invocation of the stored bound path; the exact Attempt 2 cause remains `UNKNOWN`
+without a new bounded observation.
+
+```text
+raw/secret/path/hash evidence exported: NO
+Git/GitHub write by Internal Validator: NO
+CCR service or Gateway started: NO
+H0 started: NO
+A1+ started: NO
+next Task started: NO
+```
+
+Because the original PowerShell process is closed, Attempt 2 cannot resume and its
+in-memory bindings/fingerprints must not be reconstructed. The retained nonce
+validation workspace is not deleted by this repair; exact-nonce cleanup remains a
+separate Human action after Gate review.
+
+## Attempt 3 authorization
+
+Attempt 3 is `READY_FOR_INTERNAL_VALIDATION` on the new final frozen PR head supplied
+by Human Gate. The only authorized first step is A0 in a new dedicated interactive
+64-bit PowerShell console. The console remains open after the compact sanitized A0
+capsule is returned. H0 and A1+ remain unauthorized until that Evidence is reviewed.
+T01 remains blocked until T00 Human decision `ACCEPTED`.
 
 ## Attempts
 
 | Attempt | Actor / session role | Candidate | Internal result | Recommendation |
 |---:|---|---|---|---|
 | 1 | A0 Internal Validator; H0–H2 and A1–A3 Human Gate Owner | `97b73a9f...` | `BLOCKED — GLOBAL_PROFILE_PERSISTENCE` | approve Company-only T02 helper, then retry T00; do not start T01 |
-| 2 | INTERNAL_VALIDATOR + HUMAN_GATE_OWNER, human-assisted | final frozen PR head supplied by Human Gate | `NOT_STARTED` | `READY_FOR_INTERNAL_VALIDATION` — A0 only; hold H0/A1+ pending sanitized A0 review; do not start T01 |
+| 2 | INTERNAL_VALIDATOR, A0 preflight | `c2459b90182041afdb7b9c0cf44149494b30f910` | `BLOCKED — BLOCKED_TOOLCHAIN_IDENTITY`; exact checkpoint not captured; console closed | do not resume or diagnose stale state; preserve workspace; repair sanitized A0 observability only |
+| 3 | INTERNAL_VALIDATOR + HUMAN_GATE_OWNER, human-assisted | new final frozen PR head supplied by Human Gate | `NOT_STARTED` | `READY_FOR_INTERNAL_VALIDATION` — A0 only; hold H0/A1+ pending sanitized A0 review; do not start T01 |
 
 ## Human decision
 
