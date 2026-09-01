@@ -20,7 +20,10 @@
 - Stage: `V1-S1`
 - Active Task: `V1-S1-T00`
 - Active Task path: `company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md`
-- Status: `READY_INTERNAL`
+- Status: `BLOCKED`
+- Attempt 1: `BLOCKED — GLOBAL_PROFILE_PERSISTENCE`
+- Blocker: `H1_ONBOARDING_GATE_REQUIRES_FORBIDDEN_CONNECT_AGENT`
+- Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
 - Goal: Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행해도 Enterprise Claude settings, actual Claude-3p, User/Machine env와 일반 `claude`가 변경되지 않는지 증명
 - Candidate product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
@@ -180,7 +183,7 @@ Enterprise before/during/after PASS
 | Router stop as rollback | REJECTED | observed persistent client config |
 | Dual command model | ACCEPTED_AS_V1_DEFAULT | `claude` vs `company-claude` |
 | Only-opened-from-CCR + CLI-only | ACCEPTED_AS_V1_DEFAULT | System default prohibited |
-| Runtime LOCALAPPDATA sandbox | READY_FOR_SPIKE | V1-S1-T00 |
+| Runtime LOCALAPPDATA sandbox | START_ISOLATION_PASS_CONFIG_SAVE_BLOCKED | V1-S1-T00 Attempt 1 |
 | GLM onboarding | DEFERRED | serving rollout |
 | Gateway completion/stream/tool | UNVERIFIED | later V1-S1 Tasks |
 | Claude Code isolated E2E | UNVERIFIED | V1-S2 |
@@ -210,11 +213,13 @@ local recovery backup outside repository
 
 ## Current open risks
 
-- Runtime sandbox feasibility is not yet proven on internal Windows.
-- Existing CCR runtime config may contain stale global/System-default profile state.
-- `start --no-gateway` alone is insufficient: UI config save can still call Claude App sync.
+- Management start isolation passed one Windows Attempt, but config-save isolation is still untested.
+- Unfinished onboarding has no supported path to existing Profile/Settings management without the forbidden `Connect agent` action.
+- Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
+- `saveConfig` can sync Claude App state and apply profiles; T00 Attempt 2 must exercise this stock path inside the existing safety envelope.
+- Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; retry must verify it is OFF before the first edit/save.
 - Runtime sandbox may affect app discovery or child environment inheritance; CLI-only scope limits this but must be tested.
-- If sandbox fails, a minimal explicit Claude App sync-disable Core patch may be needed.
+- A Core sync-disable patch is not justified by Attempt 1 because sandbox start and Claude-3p materialization passed.
 - Provider persistence, local gateway completion, Streaming, Tools and error classification remain unverified.
 - Request logs/body capture must be OFF before real prompt.
 - GLM rollout is pending.
@@ -243,28 +248,27 @@ local recovery backup outside repository
 
 ## Exact next action
 
-Internal Validator가 `V1-S1-T00` 하나만 수행한다.
+Human Gate Owner가 planned repair Task `V1-S1-T02`의 범위와 activation을 별도로 승인한다.
+
+승인 전:
 
 ```text
-1. Enterprise before baseline과 local recovery backup 확인
-2. exact candidate를 clean detached checkout
-3. CCR service를 process-local sandbox LOCALAPPDATA로 start --no-gateway
-4. CCR UI에서 enabled global Claude Code profile을 0으로 만들고 logging OFF 저장
-5. actual Enterprise settings / Claude-3p / User+Machine env / normal claude가 unchanged인지 확인
-6. CCR stop
-7. Enterprise after smoke
-8. product diff와 final Git status
-9. sanitized Evidence 반환
-```
-
-T00 PASS 전에는:
-
-```text
+제품 코드 수정 금지
+T02 실행 금지
+T00 Attempt 2 시작 금지
 V1-S1-T01 재개 금지
-Stock CCR를 actual LOCALAPPDATA에서 재시작 금지
-Connect agent / Let's start 금지
-company-claude profile 생성 금지
-real model request 금지
 ```
 
-T00 결과를 Human Gate Owner가 전달한 뒤에만 V1-S1-T01을 재활성화한다.
+승인 후 순서:
+
+```text
+1. External Codex가 onboarding의 non-persisting management entry만 구현
+2. 허용된 UI/test 경로와 exact PR head 확인
+3. Internal Validator는 exact PR head에서 T00 Attempt 2만 수행
+4. H1 첫 save 전에 enabled Provider autoFetchModels = 0 확인
+5. stock save/apply path로 global profiles 0, Request logs OFF, Agent observability OFF 저장
+6. A3/H2 invariant와 Enterprise smoke 확인
+7. T00 Human decision 후에만 repair PR merge와 T01 재개 판단
+```
+
+현재 docs PR은 Evidence와 설계만 기록하며 제품 코드를 변경하지 않는다.

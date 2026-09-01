@@ -3,7 +3,8 @@ id: V1-S1-T00
 stage: V1-S1
 title: Prove CCR runtime sandbox and Enterprise baseline invariance
 kind: spike
-status: ready_internal
+status: blocked
+blocker: H1_ONBOARDING_GATE_REQUIRES_FORBIDDEN_CONNECT_AGENT
 primary_actor: INTERNAL_VALIDATOR
 execution_mode: human_assisted
 implementation_required: false
@@ -30,7 +31,7 @@ forbidden_paths:
   - packages/**
   - package.json
   - package-lock.json
-human_decision: pending
+human_decision: retry
 ---
 
 # Prove CCR Runtime Sandbox and Enterprise Baseline Invariance
@@ -513,35 +514,35 @@ Manual settings/env recovery required: NO
 
 ## Acceptance criteria
 
-- [ ] exact instruction SHA 기록
-- [ ] exact candidate SHA 기록
-- [ ] working tree before test clean
-- [ ] Enterprise baseline smoke PASS
-- [ ] local recovery backup 상태 기록
-- [ ] all Claude clients closed before fingerprint
-- [ ] baseline captured after smoke and shutdown
-- [ ] service starts with process-local sandbox `LOCALAPPDATA`
-- [ ] parent PowerShell `LOCALAPPDATA` restored immediately
-- [ ] parent Process env boundary restored immediately
+- [x] exact instruction SHA 기록
+- [x] exact candidate SHA 기록
+- [x] working tree before test clean
+- [x] Enterprise baseline smoke PASS
+- [x] local recovery backup 상태 기록
+- [x] all Claude clients closed before fingerprint
+- [x] baseline captured after smoke and shutdown
+- [x] service starts with process-local sandbox `LOCALAPPDATA`
+- [x] parent PowerShell `LOCALAPPDATA` restored immediately
+- [x] parent Process env boundary restored immediately
 - [ ] enabled global Claude Code profiles after save = `0`
 - [ ] Request logs OFF
 - [ ] Agent observability OFF
-- [ ] Provider unchanged
-- [ ] actual Enterprise settings during/after = SAME
-- [ ] actual Claude-3p CCR config surface during/after = SAME
-- [ ] Process env during/after = SAME
-- [ ] User env during/after = SAME
-- [ ] Machine env during/after = SAME
-- [ ] normal `claude` resolution during/after = SAME
-- [ ] sandbox Claude-3p config files materialized
-- [ ] stop exit `0`
-- [ ] Enterprise after smoke PASS
-- [ ] manual rollback not required
-- [ ] product diff exit `0`
-- [ ] final Git status clean
-- [ ] secrets/raw fingerprints exported = NO
-- [ ] Git write performed = NO
-- [ ] next Task started = NO
+- [x] Provider unchanged
+- [x] actual Enterprise settings during/after = SAME
+- [x] actual Claude-3p CCR config surface during/after = SAME
+- [x] Process env during/after = SAME
+- [x] User env during/after = SAME
+- [x] Machine env during/after = SAME
+- [x] normal `claude` resolution during/after = SAME
+- [x] sandbox Claude-3p config files materialized
+- [x] stop exit `0`
+- [x] Enterprise after smoke PASS
+- [x] manual rollback not required
+- [x] product diff exit `0`
+- [x] final Git status clean
+- [x] secrets/raw fingerprints exported = NO
+- [x] Git write performed = NO
+- [x] next Task started = NO
 
 ## Result rules
 
@@ -672,12 +673,91 @@ Git write performed: NO
 Next Task started: NO
 ```
 
+## Attempt 1 Evidence — sanitized
+
+- Date: `2026-09-01`
+- Result: `BLOCKED`
+- Failure classification: `GLOBAL_PROFILE_PERSISTENCE`
+- Cause: `ONBOARDING_GATE_REQUIRES_FORBIDDEN_CONNECT_AGENT`
+- Reproducibility: `ONE_ATTEMPT / NOT_REPRODUCED`
+
+`BLOCKED`인 이유는 Enterprise invariant 침해나 sandbox start 실패가 아니라, Task가 금지한 `Connect agent` 없이 H1 cleanup/save 화면에 도달할 수 없어 policy precondition을 충족하지 못했기 때문이다.
+실제 global profile이 남았다고 단정하지 않는다. 정확한 미검증 항목은 “enabled global profile을 0으로 만들고 저장한 결과”다.
+
+### Reference and role contract
+
+```text
+Instruction SHA: 6d0d6f2aeca02e33261c062eac5aab360805222b
+Candidate SHA: 97b73a9f4e1fb23d406bb987d0785cefa1f99966
+Environment alias: UNSET
+
+A0 operator: INTERNAL_VALIDATOR
+H0/H1/H2 operator: HUMAN_GATE_OWNER
+A1/A2/A3 operator: HUMAN_GATE_OWNER manual PowerShell, internal agent OFF
+
+WINDOWS_RUNTIME_ALLOWED: YES
+CLAUDE_CODE_EXECUTION_ALLOWED: YES
+LLM_CREDENTIAL_AUTHORIZED_FOR_HOST: NOT_REQUIRED_FOR_THIS_TASK
+```
+
+Product tree equivalence는 `packages/**`, `package.json`, `package-lock.json` 범위에서 `CHATGPT_ORCHESTRATOR`가 `SAME`으로 확인했다.
+Internal Validator는 이를 독립적으로 반복하지 않았다.
+
+### Step evidence
+
+| Step | Sanitized result |
+|---|---|
+| A0 | candidate exact match `YES`; tree clean `YES`; Node `v24.15.0`; npm `11.12.1`; `win32/x64`; CLI exists `YES`; CCR stopped `YES` |
+| H0 | Enterprise CLI `PASS`; Enterprise models `PASS`; Claude Desktop `PASS`; local backup `CREATED`; Claude clients closed before baseline `YES` |
+| A1 | baseline captured after smoke/shutdown `YES`; scope `TARGETED_CCR_CONFIG_FILES` |
+| A2 | sandbox start exit `0`; parent `LOCALAPPDATA` restored `YES`; parent Process env restored `YES` |
+| H1 | cleanup/save `NOT_COMPLETED`; enabled global profiles after save `NOT_VERIFIED`; Request logs `NOT_VERIFIED`; Agent observability `NOT_VERIFIED` |
+| H1 safety | new profile `NO`; Provider changed during Attempt `NO`; prior setup `SETUP_PRE`; Connect agent `NO`; Let's start `NO`; model request `NO` |
+| A3 during/after | Enterprise settings, actual Claude-3p target surface, Process/User/Machine env and normal `claude` resolution all `SAME` |
+| A3 cleanup | sandbox Claude-3p materialized `YES`; target count `3`; stop exit `0`; product diff exit `0`; final Git status `CLEAN` |
+| H2 | Enterprise CLI/models/Desktop `PASS`; manual recovery `NO` |
+
+Coverage boundary:
+
+```text
+management start isolation: TESTED_PASS
+config-save isolation: NOT_TESTED
+company-claude child environment: NOT_TESTED
+acceptance criteria: 26 / 29 verified
+secrets/raw fingerprints exported: NO
+internal Git/GitHub write: NO
+next Task started: NO
+```
+
+## Repair finding and proposed disposition
+
+Source review at instruction SHA confirmed:
+
+- unfinished onboarding renders only `OnboardingLayout`; the existing `ProfileView` and Settings are behind the main layout;
+- onboarding profile submission persists with `applyProfile: true`, confirms the profile and advances toward `Let's start`;
+- no supported stock UI path exposes existing-profile disable/remove without the Task-forbidden `Connect agent`;
+- runtime sandbox start itself passed, so a Core Claude App sync-disable patch is not justified by this Attempt.
+
+Instruction-only repair is therefore insufficient.
+The smallest proposed product repair is the separate, still-`planned` Task `V1-S1-T02`:
+
+1. On unfinished onboarding with an existing saved agent profile, show a secondary `Manage existing configuration` action.
+2. The action is ephemeral and only changes the renderer view to the existing Profile management view.
+3. The action itself must not save config, apply a profile, mark onboarding finished, advance onboarding, start/probe a Provider or Gateway, or issue a model request.
+4. Reloading returns to onboarding because the onboarding marker is unchanged.
+5. T00 Attempt 2 must use the existing stock save/apply path; a special `applyProfile:false` cleanup would narrow the original validation question and is not accepted as the repair.
+6. Before the first H1 save, every enabled Provider must have `autoFetchModels = OFF`. Candidate `saveConfig` schedules an immediate Provider model refresh when this flag is on; if any is on, stop before editing or saving.
+
+This docs update does not authorize or implement T02.
+T02 activation, product implementation and the exact candidate/instruction SHA require a separate Human Gate decision.
+T01 remains blocked.
+
 ## Attempts
 
 | Attempt | Actor / session role | Candidate | Internal result | Recommendation |
 |---:|---|---|---|---|
-| 1 | Internal runtime isolation | `97b73a9f...` | `PENDING` | targeted config-surface sandbox 검증 |
+| 1 | A0 Internal Validator; H0–H2 and A1–A3 Human Gate Owner | `97b73a9f...` | `BLOCKED — GLOBAL_PROFILE_PERSISTENCE` | approve/implement T02, then retry T00; do not start T01 |
 
 ## Human decision
 
-`PENDING`
+`RETRY`

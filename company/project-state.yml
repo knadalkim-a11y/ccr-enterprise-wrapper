@@ -27,7 +27,7 @@ current:
   stage: V1-S1
   task_id: V1-S1-T00
   task_path: company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md
-  status: ready_internal
+  status: blocked
 
 next:
   task_id: V1-S1-T01
