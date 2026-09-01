@@ -3,13 +3,13 @@ id: V1-S1-T02
 stage: V1-S1
 title: Add a wrapper-only T00 safe config-save helper
 kind: implementation
-status: in_progress
+status: external_pass
 primary_actor: EXTERNAL_CODEX
 execution_mode: agent_only
 implementation_required: true
 internal_validation: required
 github_write_allowed: true
-candidate_sha: supplied_by_external_codex
+candidate_sha: final_repair_pr_head_supplied_by_human_gate_owner
 instruction_sha: same_as_candidate
 merge_policy: internal_pass_required
 depends_on:
@@ -43,7 +43,8 @@ human_decision: pending
 
 ## Status boundary
 
-This Task is active for the exact wrapper-only scope below.
+External implementation is complete for the exact wrapper-only scope below.
+Internal runtime validation is `NOT_STARTED` and remains required before merge.
 
 Activation record:
 
@@ -54,6 +55,16 @@ Decision: APPROVED_FOR_IMPLEMENTATION
 CCR packages/** changes: PROHIBITED
 T00 Attempt 2: NOT_STARTED
 T01: BLOCKED
+```
+
+Continuation approval after source/security audit:
+
+```text
+Date: 2026-09-01
+Authority: HUMAN_GATE_OWNER
+Decision: CONTINUE_AS_T00_VALIDATION_ONLY_HELPER
+Standalone production safety claim: PROHIBITED
+Fresh A2 spawn + quiescence + unconditional A3: REQUIRED
 ```
 
 The final Human decision remains pending until External PASS, exact-head T00 Attempt 2, and Human Gate review.
@@ -78,20 +89,35 @@ Human Gate는 CCR source patch를 거부했고 Company-owned wrapper 경로를 �
 - 이미 실행 중인 service가 있으면 `start --no-gateway`가 이를 재사용할 수 있으므로 command-line flag만으로 격리를 증명할 수 없다.
 - `saveConfig`는 항상 Claude App config sync를 수행하므로 service `LOCALAPPDATA` sandbox가 선행돼야 한다.
 - `saveConfig(next, { applyProfile: false })`는 config/Claude App sync를 유지하면서 Claude Code profile application을 생략한다.
-- `saveConfig`는 config 변화에 따라 Gateway를 side effect로 시작할 수 있다. T00은 이를 허용하지만 helper가 Gateway-control RPC를 호출하거나 model request를 보내면 안 된다.
-- Observability 세 필드 중 하나라도 바뀌면 stock runtime-change 판정상 Gateway start가 요구되므로 loopback gateway/core, disabled proxy/media/plugin/tool surfaces와 free ports를 apply 전에 확인해야 한다.
+- `saveConfig`는 restart-sensitive config가 바뀌면 Gateway를 side effect로 시작할 수 있다.
+- Observability 세 필드 중 하나라도 바뀌면 Stock runtime-change 판정상 Gateway start가 요구된다. Gateway compile은 Provider plugin이 비어 있어도 로컬 Grok OAuth refresh를 시도할 수 있으므로 T02는 observability를 바꾸지 않고 이미 safe인지 확인해야 한다.
+- Profile/legacy mirror 필드는 pinned restart predicate에 포함되지 않는다. Reusable API key와 `gateway.enabled=true`가 이미 성립하고 Claude App sync가 config를 바꾸지 않으면 profile-only save는 `updateConfig` 경로를 사용하고 Gateway는 stopped 상태를 유지한다.
 - `saveConfig`는 Provider model auto-refresh를 동기화하며 enabled Provider의 `autoFetchModels`가 켜져 있으면 즉시 refresh를 예약한다.
-- `getConfig`도 stock migration/API-key initialization을 수행할 수 있으므로 default mode는 엄밀한 read-only가 아니라 **no-save preflight**다.
+- `getOnboardingFinished`와 `getConfig`도 storage open/initialization/migration 또는 API-key initialization을 수행할 수 있으므로 default mode는 엄밀한 read-only가 아니라 **no-`saveConfig` preflight**다.
+- Windows config storage는 sandboxed `LOCALAPPDATA`가 아니라 real `APPDATA`를 사용한다. 첫 repository open 전 constants import는 `%APPDATA%\Claude Code Router` 전체를 active config dir로 복사할 수 있고, repository open은 legacy SQLite/API-key/onboarding stores를 migrate/remove할 수 있다. Legacy JSON source가 선택되면 `getConfig`가 `${ENV}`/`$ENV` placeholder를 process env 값으로 보간한 snapshot을 SQLite에 저장할 수 있다.
 - `saveAppConfig`는 legacy profile mirror를 동기화하므로 global Claude Code profile cleanup은 `profile.claudeCode.enabled`와 조건부 `profile.enabled`도 source-derived 값으로 바꾼다.
+- Stock reload는 enabled Provider의 명시적 `enabled:true`를 제거한다. Codex/opencode/kilo/workbuddy/zcode profile item에서는 `coreMode`, `frontendMode`, `remoteFrontendMode`를 disk 저장 시 제거한 뒤 reload에서 `remoteFrontendMode:"app"`을 만들고, legacy `profile.codex.remoteFrontendMode`는 제거한다. Helper는 item mode가 exact `"app"`, 두 legacy item field와 legacy profile field가 absent인 fixed point만 허용한다.
+- Stock reload는 unknown profile agent를 제거하고 NVIDIA preset Provider capabilities를 한 개의 `openai_chat_completions` capability로 repair한다. Helper는 known exact agent set과 NVIDIA normalized capability fixed point만 허용한다.
 - Claude App sync backup은 real `%APPDATA%\claude-code-router`에 저장되므로 stale backup이 있으면 apply 전에 차단해야 한다.
 - `getServiceIdentity`만으로 pinned binary/config root를 증명할 수 없으므로 `getAppInfo`의 name/version/platform/config/data paths를 함께 검증해야 한다.
 - Management RPC는 pinned `v3.0.22` source dependency이며 영구 public API로 간주하지 않는다.
+- `NODE_DEBUG`는 Node startup 전에 제거해야 한다. Helper 내부에서 값을 지우는 것은 HTTP header/body debug를 안전하게 끄는 방법이 아니다.
+- Node 24의 coverage/compile-cache/warning redirect 환경변수는 helper code보다 먼저 또는 process exit 때 파일을 만들 수 있고, npm lifecycle은 `npm_config_node_options`/`npm_config_script_shell`을 해석한다. T00은 첫 npm/Node 전에 이 surface를 차단하고 A2 직전에 다시 확인한다.
+- `CCR_WEB_AUTH_TOKEN`/`CCR_WEB_ALLOWED_ORIGINS`는 management auth/CORS 경계를 바꾸며, `CCR_MODEL_CATALOG_PATH`와 legacy `CCR_MODELS_JSON_PATH`는 정상 Claude App sync가 읽는 model catalog를 바꾼다. 모두 inherited override로 간주한다.
+- Local-agent Provider는 load/save 정규화 중 host의 Grok environment/version file/account endpoint를 읽을 수 있으므로 이 좁은 validation helper에서는 magic local-agent API key를 가진 모든 Provider를 save 전에 차단한다.
 
 ## Scope boundary
 
 이 Task는 T00 차단 해소용 validation helper다.
 V1-S1에서 Company helper를 추가하는 것은 원래 V1-S3/V1-S4 launcher/Doctor 일정의 좁은 예외이므로 Human Gate의 별도 activation 승인이 필요하다.
 Production `company-claude` launcher, installer, setup 또는 Doctor로 일반화하지 않는다.
+
+Stock `v3.0.22` RPC는 daemon이 실제로 상속한 `LOCALAPPDATA`를 노출하지 않고 `saveConfig`에 revision/CAS를 제공하지 않는다.
+따라서 helper 단독으로 sandbox inheritance나 원자적 compare-and-save를 증명한다고 주장하지 않는다.
+T00 A0/A2가 absent state에서 같은 PowerShell이 sandbox `LOCALAPPDATA`로 fresh daemon을 시작한 사실을 증명하고, 모든 CCR management/client writer를 quiesce하며, A3가 결과와 관계없이 actual Enterprise/Claude-3p invariant와 cleanup을 검증하는 범위에서만 사용한다.
+또한 T00은 daemon 시작 직전에 whole legacy Windows config directory와 active/home legacy JSON, legacy API-key DB/sidecars 및 onboarding marker가 absent인지 metadata-only로 확인해야 한다. Canonical config directory, `config.sqlite`와 optional sidecars의 bounded/non-reparse metadata 검사는 DB row/schema fixed point나 첫 open의 무기록성을 증명하지 않으며, helper-only 검사는 import/migration 뒤라 너무 늦다.
+
+이 제한은 CCR source를 수정하지 않는 Human 결정의 명시적 trade-off다.
 
 ## Required knowledge
 
@@ -102,13 +128,20 @@ Production `company-claude` launcher, installer, setup 또는 Doctor로 일반�
 - `company/docs/AGENT_WORKFLOW.md`
 - `packages/cli/src/cli.ts` — read-only
 - `packages/core/src/runtime/app-paths.ts` — read-only
+- `packages/core/src/config/constants.ts` — read-only
 - `packages/core/src/config/config.ts` — read-only
+- `packages/core/src/config/config-repository.ts` — read-only
+- `packages/core/src/storage/migration.ts` — read-only
+- `packages/core/src/config/onboarding-state.ts` — read-only
 - `packages/core/src/web/management-server.ts` — read-only
 - `packages/core/src/contracts/app.ts` — read-only
 - `packages/core/src/providers/model-auto-refresh.ts` — read-only
 - `packages/core/src/agents/claude-app/gateway-service.ts` — read-only
 - `packages/core/src/gateway/runtime-change.ts` — read-only
 - `packages/core/src/gateway/application/gateway-service.ts` — read-only
+- `packages/core/src/gateway/core-runtime/config-compiler.ts` — read-only
+- `packages/core/src/agents/local-providers/grok.ts` — read-only
+- `packages/core/src/routing/route-script-runtime.ts` — read-only
 
 ## In scope
 
@@ -119,6 +152,19 @@ Production `company-claude` launcher, installer, setup 또는 Doctor로 일반�
 - Compact sanitized output for the keyboard-only Evidence boundary.
 - Exact repair PR head handoff to T00 Attempt 2.
 
+Role-owned canonical transition after External PASS:
+
+```text
+EXTERNAL_CODEX
+→ only the frontmatter allowed_paths above
+
+CHATGPT_ORCHESTRATOR
+→ may update T00, company/project-state.yml, company/docs/STATUS.md,
+  and company/gates/V1-S1.md to record external PASS and activate exact-head T00 retry
+```
+
+The orchestrator transition does not expand the helper implementation scope and may not touch `packages/**`.
+
 ## Out of scope
 
 - Any change under `packages/**` or other upstream-owned path.
@@ -128,44 +174,43 @@ Production `company-claude` launcher, installer, setup 또는 Doctor로 일반�
 - Provider/key/model/protocol/router/API-key change.
 - Provider probe, connectivity check, model refresh or real model request.
 - Production launcher/setup/Doctor.
+- Standalone claim that the helper attests daemon `LOCALAPPDATA` or provides atomic CAS.
 - Dependency, lockfile or workflow change.
 - T01.
 
 ## Implementation contract
 
+0. Invoke only inside T00 after A0 proves no service state/backup and no legacy import/migration source, H0 closes every CCR/Claude writer, and A2 rechecks those metadata-only guards before freshly starting the daemon with sandbox `LOCALAPPDATA` from the exact archived-source working directory. The helper does not independently attest daemon `LOCALAPPDATA`, legacy pre-start absence, DB row/schema fixed point, or runtime cwd and is not a production launcher.
 1. Accept only no argument or one exact `--apply`; invalid arguments return a fixed usage category without echoing input. Default mode is a **no-`saveConfig` preflight**, not an inert/read-only claim.
-2. Require Windows and an absolute `APPDATA`. Reject `CCR_INTERNAL_APP_DATA_DIR`, `CCR_INTERNAL_USER_DATA_DIR` or other runtime-path overrides. Never fall back to restored `LOCALAPPDATA`.
+2. Require Windows and an absolute `APPDATA`. Reject `CCR_INTERNAL_APP_DATA_DIR`, `CCR_INTERNAL_HOME_DIR`, `CCR_INTERNAL_USER_DATA_DIR`, `CCR_GATEWAY_ENTRY`, `CCR_MODELS_JSON_PATH`, `CCR_MODEL_CATALOG_PATH`, `CCR_NODE_BIN`, `CCR_UPSTREAM_PROXY_URL`, `CCR_WEB_ALLOWED_ORIGINS`, `CCR_WEB_AUTH_TOKEN`, `NODE_COMPILE_CACHE`, `NODE_DEBUG`, `NODE_OPTIONS`, `NODE_REDIRECT_WARNINGS`, `NODE_V8_COVERAGE`, `npm_config_node_options` and `npm_config_script_shell`. Never fall back to restored `LOCALAPPDATA`. T00 must prove these values are absent before the first npm/Node process and again immediately before A2; helper-side rejection is defense in depth, not a claim that Node startup artifacts can be prevented from JavaScript.
 3. Read only `%APPDATA%\claude-code-router\service.json`, with file-type and size limits. Require the pinned exact state shape, positive numeric PID, live process, `profileManaged === false`, `startGateway === false`, nonempty service token, valid `startedAt`, and no unexpected keys.
 4. Require `%APPDATA%\claude-code-router\claude-app-gateway-backup.json` to be absent before any RPC that can save.
 5. Accept only a canonical `http://127.0.0.1:<explicit-port>/?ccr_web_token=<one-nonempty-value>` URL: root path, no userinfo, fragment, extra/duplicate query or DNS hostname. Send the token only as `x-ccr-web-auth` to fixed `/api/ccr/rpc`.
-6. Use direct built-in `node:http` with `agent: false`, no redirect/retry/proxy, fixed timeouts, explicit content length, JSON content-type validation, and bounded request/response bodies. Neutralize runtime HTTP debug before networking.
+6. Use direct built-in `node:http` with `agent: false`, no redirect/retry/proxy, an absolute timeout, explicit content length, exact `application/json` media-type validation, and bounded request/response bodies on every status path. Fail before loading secrets or networking if the Node process inherited `NODE_DEBUG` or `NODE_OPTIONS`.
 7. Call `getAppInfo([])` and require exact name `Claude Code Router`, version `3.0.22`, platform `win32`, and config/data paths equal to `%APPDATA%\claude-code-router` without printing them.
 8. Call `getServiceIdentity([serviceToken])`. Require `serviceTokenConfigured === true`, `serviceTokenMatches === true`, and returned PID equal to service state.
-9. Call `getGatewayStatus([])`. Require fresh pre-save state `stopped`, no external-management flag equal to `true`, and no already-active gateway/core endpoint or network listener state.
+9. Call `getGatewayStatus([])`. Require exact fresh pre-save state `stopped`, no external-management flag equal to `true`, PID/endpoint/core endpoint/network listener absent, and no prior error/start timestamp.
 10. Call `getOnboardingFinished([])` and retain only its boolean value for equality checking.
 11. Call `getConfig([])` and reject fallback/default or malformed config: nonempty enabled Provider/model, unique profile IDs, existing reusable API key, pinned JSON-safe shape, and required current-config invariants.
-12. Require `gateway.enabled === true`, numeric gateway/core ports and exact loopback hosts. Require proxy/system proxy, media tools, plugins, provider plugins, Tool Hub/browser automation and configured agent MCP servers to be disabled/empty before apply.
-13. Treat a Provider as enabled unless `enabled === false`. Require `enabled` and `autoFetchModels` to be boolean or absent; block if any enabled Provider has `autoFetchModels === true`. Do not modify Provider state.
-14. Verify the initial legacy profile mirrors are already source-consistent. Build a JSON-safe deep clone and change only:
-    - enabled `claude-code` profiles whose scope is neither `"ccr"` nor `"custom"`—including global, missing and unknown legacy values—to `enabled: false`;
-    - `observability.requestLogs` to `false`;
-    - `observability.agentAnalysis` to `false`;
-    - `observability.requestLogBodyCapture` to `"none"`;
+12. Require `gateway.enabled === true`, numeric gateway/core ports and exact loopback hosts. Require proxy/system proxy/network capture, media tools, plugins, provider plugins, Tool Hub/browser automation, configured agent MCP servers and Context Archive to be disabled/empty, require `virtualModelProfiles` to be empty, and reject every enabled Router script rule before apply.
+13. Treat a Provider as enabled unless `enabled === false`. Require Stock-canonical Provider state: `enabled` is absent for enabled Providers and exact `false` for disabled Providers; `autoFetchModels` is boolean or absent. Block every magic local-agent Provider and block if any enabled Provider has `autoFetchModels === true`. For an NVIDIA preset base URL, require the exact single normalized `openai_chat_completions` capability fixed point. Do not modify Provider state.
+14. Require `observability.requestLogs === false`, `observability.agentAnalysis === false` and `observability.requestLogBodyCapture === "none"` before building a target; never change observability in this Task. Require every profile agent to be in the pinned known exact agent set and every scope to be canonical `global`, `ccr` or `custom`; missing/unknown agent or scope blocks before save. Every Codex/opencode/kilo/workbuddy/zcode item must have exact `remoteFrontendMode:"app"` with `coreMode` and `frontendMode` absent, and legacy `profile.codex.remoteFrontendMode` must be absent. Verify the full initial Claude/Codex legacy mirrors and single-enabled-global-per-agent invariant are already source-consistent. Build a JSON-safe deep clone and change only:
+    - enabled `claude-code` profiles with exact scope `"global"` to `enabled: false`;
     - source-derived `profile.claudeCode.enabled` to `false`;
     - source-derived `profile.enabled` to the pinned `synchronizeLegacyProfileConfig` result.
-15. Canonically prove before save that profile count/IDs/order and every non-allowlisted field—including Providers, preferred Provider, models, router, API keys and onboarding-relevant config—are exact-equal.
+15. Canonically prove before save that profile count/IDs/order and every non-allowlisted field—including all observability, Providers, preferred Provider, models, router, API keys and onboarding-relevant config—are exact-equal. The snapshot must also be a fixed point for pinned Stock Provider/profile reload normalization.
 16. Without `--apply`, report only whether a change is required and the target safe state; do not claim the current global count is already zero and do not call `saveConfig`.
 17. If `--apply` is requested but no change is required, return `APPLY=SKIP|CHANGE=N` without save. T00 must classify this as config-save coverage not exercised, not PASS.
-18. Immediately before save, re-read the raw service-state file and require exact equality, then repeat service identity, stopped Gateway, onboarding boolean and `getConfig`. Require the second config to be canonically equal to the initial snapshot and re-run all guards.
-19. Check that the configured loopback gateway and core TCP ports are free immediately before save. A race or ambiguity blocks.
-20. Call exactly one mutation RPC: `saveConfig([fullNextConfig, { applyProfile: false }])`.
+18. Check the configured loopback gateway and core TCP ports immediately before the final snapshot sequence; occupied or ambiguous ports block.
+19. After the port checks, re-read the raw service-state file and require exact equality, then repeat service identity, stopped Gateway, onboarding boolean and `getConfig`, re-run all guards, and check backup absence again. Require the second config to be canonically equal to the initial snapshot. Stock RPC has no revision/CAS, so T00 quiescence is mandatory and this checkpoint is not described as an atomic guarantee.
+20. Call exactly one explicit mutation RPC: `saveConfig([fullNextConfig, { applyProfile: false }])`. Read RPC handlers may initialize/migrate Stock storage, so “one mutation RPC” is not a claim that no internal storage write can occur.
 21. Never retry a mutation. Any timeout, disconnect, malformed/oversized response or RPC error after save dispatch is `INDETERMINATE_SAVE` with `SAVE=UNKNOWN`; it is not a safe pre-save block.
-22. After a confirmed save response, call `getConfig([])`, `getOnboardingFinished([])` and `getGatewayStatus([])`. Require returned and re-read config exact-equal to the expected target, onboarding unchanged, and post Gateway state either safely stopped or locally managed running—not starting/error/external.
+22. After a confirmed save response, call `getConfig([])`, `getOnboardingFinished([])` and `getGatewayStatus([])`. Require returned and re-read config exact-equal to the expected target, onboarding unchanged, and post Gateway state still `stopped` with configured loopback endpoints, no PID/external ownership/network endpoint/error/start timestamp. Any `running`, `starting` or `error` state is a post-save failure.
 23. Do not call `setOnboardingFinished`, `applyProfile`, `applyClaudeAppGateway`, `openProfile`, Gateway controls, Provider probes, connectivity checks, model catalog methods or model APIs.
-24. A Gateway may start only as the stock `saveConfig` side effect. The helper must not invoke it or send a request through it.
+24. Gateway start is prohibited. The pinned source proof and exact profile-only diff must keep the Stock save on `gatewayService.updateConfig`; any observed start is `POSTCONDITION_FAILURE`, followed by unconditional T00 A3 cleanup. The helper must not invoke or send a request through the Gateway.
 25. Never print, persist or return the management URL/token, service token, full config, Provider fields, API keys, model IDs, paths, raw RPC bodies or server error text.
-26. Do not stop the service after save or an indeterminate save; T00 A3 always owns fingerprint, stop and cleanup.
-27. On any pre-save ambiguity, output a fixed `BLOCKED` category and guarantee no save dispatch.
+26. Do not stop the service after save or an indeterminate save; T00 A3 always owns fingerprint, stock stop, captured-PID death proof and cleanup. T00 must run A3 for every helper result, especially `SAVE=UNKNOWN`.
+27. On any ambiguity observed before mutation dispatch, output a fixed `BLOCKED` category and guarantee no save dispatch. Client-side snapshot checks do not claim to replace unavailable server-side CAS.
 28. Output exactly one compact sanitized line and a documented process exit code.
 
 ## Sanitized output contract
@@ -173,7 +218,7 @@ Production `company-claude` launcher, installer, setup 또는 Doctor로 일반�
 Apply path:
 
 ```text
-T02|RESULT=PASS|SERVICE=P|GW_PRE=STOP|GW_POST=STOP_OR_RUN|RPC=P|APPLY=P|CHANGE=Y|GLOBAL=0|LOGS=OFF|ANALYSIS=OFF|BODY=NONE|PROVIDER=SAME|ONBOARDING=SAME|AUTOFETCH=OFF|RAW=NO
+T02|RESULT=PASS|SERVICE=P|GW_PRE=STOP|GW_POST=STOP|RPC=P|APPLY=P|CHANGE=Y|GLOBAL=0|LOGS=OFF|ANALYSIS=OFF|BODY=NONE|PROVIDER=SAME|ONBOARDING=SAME|AUTOFETCH=OFF|RAW=NO
 ```
 
 No-save preflight:
@@ -235,31 +280,49 @@ Run and record:
 ```text
 node --check company/scripts/t00-safe-config-save.mjs
 node --test company/tests/t00-safe-config-save.test.mjs
-git diff --check
-git diff -- company/scripts company/tests company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md
-git status --short
+git diff --check 05bd8fd14048c2544a31deae99bafac4d2820ece HEAD
+git diff --name-status 05bd8fd14048c2544a31deae99bafac4d2820ece HEAD
+git diff 05bd8fd14048c2544a31deae99bafac4d2820ece HEAD -- company/scripts company/tests company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md
+git diff --exit-code 97b73a9f4e1fb23d406bb987d0785cefa1f99966 HEAD -- packages package.json package-lock.json
+git status --porcelain
 ```
 
 Tests use only synthetic configs, fake tokens and a loopback mock RPC server.
+
+External result:
+
+```text
+Date: 2026-09-01
+Base commit: 05bd8fd14048c2544a31deae99bafac4d2820ece
+Implementation scope: company/scripts + company/tests + this Task only
+node --check: PASS
+node --test: PASS — 159/159
+Product tree equivalence: PASS
+CCR packages/** changed: NO
+Secrets/raw internal evidence used: NO
+Internal runtime validation: NOT_STARTED
+Recommendation: READY_FOR_INTERNAL_VALIDATION
+```
 They must cover:
 
 - invocation: default never saves; only one exact `--apply`; invalid/duplicate arguments are fixed-output exit `64`;
-- state: missing/malformed/oversized/symlink state, strict field types, dead/mismatched PID, `startGateway != false`, `profileManaged != false`, path overrides and stale backup all block before save;
+- state: missing/malformed/oversized/symlink state, strict field types, dead/mismatched PID, `startGateway != false`, `profileManaged != false`, path/runtime/debug/output/auth/catalog/Gateway-executable overrides and stale backup all block before save;
 - endpoint/transport: only canonical numeric loopback HTTP; reject localhost/DNS/LAN/HTTPS/userinfo/fragment/path/port/token/query variants; exact RPC path/header/body, no redirect/proxy/retry, bounded JSON and timeout behavior;
 - identity: exact app name/version/platform/config roots, configured/matching token and PID;
-- Gateway: stopped/non-external fresh pre-state; unsafe post-state fails;
-- runtime surface: loopback gateway/core, free ports and disabled proxy/media/plugin/provider-plugin/Tool Hub/MCP side effects;
+- Gateway: exact stopped/non-external/never-started fresh pre-state; only configured local `STOP` is accepted post-save;
+- runtime surface: loopback gateway/core, free ports, logging already safe, and disabled proxy/network-capture/media/plugin/provider-plugin/Tool Hub/MCP/Context Archive/virtual-model/enabled-script side effects;
 - config fallback and malformed JSON-safe shapes block;
-- auto-fetch matrix: enabled/absent Provider plus `true` blocks; disabled Provider plus `true` is allowed; non-boolean values block;
-- transform: global/missing/unknown Claude scope disabled; `ccr`, `custom` and non-Claude profiles preserved; profile ID/count/order preserved;
-- source-derived legacy `profile.claudeCode.enabled` and conditional `profile.enabled` exactly modeled;
-- logging/analysis/body capture OFF while Provider/model/router/API-key/onboarding and all unrelated config remain exact;
+- Provider matrix: every local-agent Provider blocks; enabled/absent Provider plus auto-fetch `true` blocks; disabled Provider plus `true` is allowed; non-boolean values block; NVIDIA preset capability fixed point is exact;
+- transform: canonical global Claude scope disabled; missing/unknown agent or scope blocks; `ccr`, `custom` and known non-Claude profiles preserved; profile ID/count/order preserved;
+- complete Stock-shaped `AppConfig` success fixture and independent pinned save-normalization emulator, including enabled-Provider omission, Codex-family mode strip/reload, legacy mode removal and the profile-only `updateConfig` versus runtime-sensitive `start` decision;
+- full source-derived Claude/Codex legacy mirrors, single-global invariant and conditional `profile.enabled` exactly modeled;
+- logging/analysis/body capture are already OFF/NONE and remain exact while Provider/model/router/API-key/onboarding and all unrelated config remain exact;
 - concurrency: service state, identity, Gateway, onboarding and config are rechecked; any change blocks before save;
 - exact one save with `{ applyProfile: false }`; no forbidden/Gateway/model RPC;
 - confirmed save response and post-read exact expected config;
 - already-safe apply skips save and is not represented as T00 save coverage;
 - save timeout/disconnect is one-attempt `INDETERMINATE_SAVE`, zero retry, fixed exit `3`;
-- canary URL/auth/service token/API key/provider endpoint/model/path/server error/raw body never appears in combined stdout/stderr or written artifacts.
+- canary URL/auth/service token/API key/provider endpoint/model/path/server error/raw body never appears in helper capsules; actual CLI stdout/stderr is tested with startup debug/preload options absent, and no helper-created artifact or service-state write appears.
 
 ## Acceptance criteria
 
@@ -267,23 +330,27 @@ They must cover:
 - [ ] diff limited to approved `company/**` paths
 - [ ] no upstream/CCR source, dependency, lockfile or workflow change
 - [ ] no direct runtime DB/config edit
+- [ ] validation-only scope and unavailable daemon-LOCALAPPDATA/CAS attestation limitation recorded
 - [ ] default invocation makes no `saveConfig` call
 - [ ] apply requires explicit flag
 - [ ] no pre-existing service and fresh A2 state/PID proved by T00 A0/A2
 - [ ] pinned app identity/config root verified
 - [ ] stale Claude App backup fail-closed
 - [ ] loopback HTTP/auth-header/service identity/Gateway pre-state fail-closed
-- [ ] unsafe Gateway startup surfaces and occupied ports fail-closed
+- [ ] Node startup/debug and Gateway executable/upstream override env fail-closed before secrets/network
+- [ ] logging/analysis/body capture already OFF/OFF/NONE and unchanged
+- [ ] unsafe Gateway startup/network-capture/Context Archive/virtual-model/enabled-script surfaces and occupied ports fail-closed
 - [ ] auto-fetch fail-closed
 - [ ] exact allowlisted transform proven
-- [ ] source-derived legacy profile mirrors modeled
+- [ ] full source-derived legacy profile mirrors and single-global invariant modeled
+- [ ] Stock Provider/profile reload fixed point modeled, including NVIDIA capabilities, exact Codex-family `remoteFrontendMode:"app"` and stripped legacy fields; missing/unknown profile agent or scope blocks
 - [ ] profile count/IDs preserved
 - [ ] Provider/model/router/API-key/onboarding state preserved
 - [ ] concurrency recheck before save
 - [ ] `applyProfile:false` passed
 - [ ] already-safe state skips save
 - [ ] mutation uncertainty classified without retry
-- [ ] safe post Gateway state observed
+- [ ] post Gateway remains exactly stopped; any start fails
 - [ ] no forbidden or explicit Gateway-control RPC invoked
 - [ ] synthetic/mock tests pass
 - [ ] compact sanitized output only
@@ -300,10 +367,14 @@ They must cover:
 - T00 cannot prove the service was stopped before A2 or service identity does not match.
 - Gateway is already running or externally owned before save.
 - Gateway/core addresses, ports, proxy, media, plugin, Tool Hub or MCP startup surfaces are unsafe.
+- Request logs/agent analysis/body capture are not already `OFF/OFF/NONE`, or an enabled Router script would be prepared.
+- Node startup/debug, Gateway executable or inherited upstream override env is present.
 - Full config round-trip cannot preserve non-target fields.
 - Config/service/onboarding state changes during the pre-save concurrency window.
+- T00 cannot quiesce other CCR management/config writers for the client-side snapshot/save interval.
 - Enabled Provider auto-fetch cannot be proven OFF before save.
 - A Provider/model request or explicit Gateway-control RPC is required.
+- The save would require or actually causes a Gateway start.
 - Secret/raw internal evidence would need to be exported.
 - Human Gate withdraws approval or the required scope expands beyond the approved Company-only paths.
 
@@ -342,16 +413,18 @@ Next Task started: NO
 
 | Attempt | Actor / session role | Candidate | Instruction | External | Internal | Recommendation |
 |---:|---|---|---|---|---|---|
+| 1 | EXTERNAL_CODEX / wrapper-only implementation | final repair PR head supplied by Human Gate | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, product tree equivalence | `NOT_STARTED` | `READY_FOR_INTERNAL_VALIDATION` — freeze exact head and run T00 Attempt 2 A0 only |
 
 ## Evidence / limitations
 
 T00 Attempt 1 is the only internal runtime Evidence so far.
-Human Gate activated this Task on `2026-09-01`; implementation and synthetic tests are now authorized only within the declared paths.
+Human Gate activated this Task on `2026-09-01`; implementation and synthetic tests passed only within the declared paths.
+The helper remains validation-only and has not run against internal runtime data.
 The pinned Management RPC dependency must be revalidated on every upstream update.
 
 ## Agent recommendation
 
-`IN_PROGRESS — IMPLEMENT WRAPPER-ONLY HELPER`
+`READY_FOR_INTERNAL_VALIDATION — FREEZE EXACT HEAD; RUN T00 ATTEMPT 2 A0 ONLY`
 
 ## Human decision
 
