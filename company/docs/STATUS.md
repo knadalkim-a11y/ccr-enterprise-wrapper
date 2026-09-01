@@ -214,10 +214,13 @@ local recovery backup outside repository
 ## Current open risks
 
 - Management start isolation passed one Windows Attempt, but config-save isolation is still untested.
-- Unfinished onboarding has no supported path to existing Profile/Settings management without the forbidden `Connect agent` action.
+- Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
+- Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
 - Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
-- `saveConfig` can sync Claude App state and apply profiles; T00 Attempt 2 must exercise this stock path inside the existing safety envelope.
-- Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; retry must verify it is OFF before the first edit/save.
+- Stock Management RPC can save with `applyProfile:false`, preserving sandboxed Claude App sync without applying the cleanup profile; the Company helper is not implemented yet.
+- `start --no-gateway` can reuse an existing service; T00 A0/A2 plus service-identity and pre-save Gateway-state checks are mandatory.
+- Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; the helper must fail closed before save unless it is OFF.
+- The Management RPC is pinned-version source surface rather than a permanent public API and must be revalidated on upstream update.
 - Runtime sandbox may affect app discovery or child environment inheritance; CLI-only scope limits this but must be tested.
 - A Core sync-disable patch is not justified by Attempt 1 because sandbox start and Claude-3p materialization passed.
 - Provider persistence, local gateway completion, Streaming, Tools and error classification remain unverified.
@@ -248,13 +251,13 @@ local recovery backup outside repository
 
 ## Exact next action
 
-Human Gate Owner가 planned repair Task `V1-S1-T02`의 범위와 activation을 별도로 승인한다.
+Human Gate Owner가 planned Company repair Task `V1-S1-T02`의 범위와 activation을 별도로 승인한다.
 
 승인 전:
 
 ```text
-제품 코드 수정 금지
-T02 실행 금지
+CCR packages/** 수정 금지
+wrapper helper 구현 금지
 T00 Attempt 2 시작 금지
 V1-S1-T01 재개 금지
 ```
@@ -262,13 +265,14 @@ V1-S1-T01 재개 금지
 승인 후 순서:
 
 ```text
-1. External Codex가 onboarding의 non-persisting management entry만 구현
-2. 허용된 UI/test 경로와 exact PR head 확인
-3. Internal Validator는 exact PR head에서 T00 Attempt 2만 수행
-4. H1 첫 save 전에 enabled Provider autoFetchModels = 0 확인
-5. stock save/apply path로 global profiles 0, Request logs OFF, Agent observability OFF 저장
-6. A3/H2 invariant와 Enterprise smoke 확인
-7. T00 Human decision 후에만 repair PR merge와 T01 재개 판단
+1. External Codex가 company/scripts와 company test 경로에 T00 전용 helper만 구현
+2. helper는 stock loopback Management RPC만 사용하고 DB를 직접 수정하지 않음
+3. getServiceIdentity/getGatewayStatus로 service identity 일치와 pre-save Gateway stopped 상태 확인
+4. enabled Provider autoFetchModels가 OFF가 아니면 save 전에 fail-closed
+5. getConfig 후 allowlisted cleanup만 만들고 saveConfig(..., { applyProfile:false }) 사용
+6. exact repair PR head에서 Internal Validator가 T00 Attempt 2만 수행
+7. A3/H2 invariant와 Enterprise smoke 확인
+8. T00 Human decision 후에만 repair PR merge와 T01 재개 판단
 ```
 
-현재 docs PR은 Evidence와 설계만 기록하며 제품 코드를 변경하지 않는다.
+현재 docs PR은 Evidence와 wrapper-only 설계만 기록하며 구현 코드를 변경하지 않는다.

@@ -729,34 +729,59 @@ internal Git/GitHub write: NO
 next Task started: NO
 ```
 
-## Repair finding and proposed disposition
+## Repair finding and Human Gate direction
 
 Source review at instruction SHA confirmed:
 
-- unfinished onboarding renders only `OnboardingLayout`; the existing `ProfileView` and Settings are behind the main layout;
+- unfinished onboarding renders only `OnboardingLayout`; the existing Profile/Settings management views are not reachable without the `Connect agent` flow;
 - onboarding profile submission persists with `applyProfile: true`, confirms the profile and advances toward `Let's start`;
-- no supported stock UI path exposes existing-profile disable/remove without the Task-forbidden `Connect agent`;
-- runtime sandbox start itself passed, so a Core Claude App sync-disable patch is not justified by this Attempt.
+- no supported stock UI path exposes the required H1 cleanup without a forbidden action;
+- runtime sandbox start itself passed, so a CCR Core or UI patch is not justified by this Attempt.
 
-Instruction-only repair is therefore insufficient.
-The smallest proposed product repair is the separate, still-`planned` Task `V1-S1-T02`:
+Human Gate decision:
 
-1. On unfinished onboarding with an existing saved agent profile, show a secondary `Manage existing configuration` action.
-2. The action is ephemeral and only changes the renderer view to the existing Profile management view.
-3. The action itself must not save config, apply a profile, mark onboarding finished, advance onboarding, start/probe a Provider or Gateway, or issue a model request.
-4. Reloading returns to onboarding because the onboarding marker is unchanged.
-5. T00 Attempt 2 must use the existing stock save/apply path; a special `applyProfile:false` cleanup would narrow the original validation question and is not accepted as the repair.
-6. Before the first H1 save, every enabled Provider must have `autoFetchModels = OFF`. Candidate `saveConfig` schedules an immediate Provider model refresh when this flag is on; if any is on, stop before editing or saving.
+```text
+CCR source changes: REJECTED
+packages/** changes: PROHIBITED
+repair direction: COMPANY-OWNED WRAPPER ONLY
+```
+
+Wrapper feasibility source review found a supported pinned-version path:
+
+- Company-owned implementation belongs under `company/**`.
+- Stock CCR `v3.0.22` exposes an authenticated loopback Management RPC with `getConfig` and `saveConfig`.
+- The local CLI service state contains the tokenized management URL, service identity and start mode; a Company helper may read them in memory but must never print or persist raw values.
+- A prior service can be reused despite `start --no-gateway`, so T00 A0/A2 plus `getServiceIdentity` and pre-save `getGatewayStatus` must prove the sandbox service identity and stopped Gateway state.
+- `saveConfig(next, { applyProfile: false })` preserves the stock Claude App sync path while preventing the cleanup save from applying a global Claude Code profile.
+- `saveConfig` can still start the Gateway as a config-save side effect. T00 already permits this; no Provider/model request may be sent.
+- `saveConfig` always synchronizes Provider model auto-refresh. Every enabled Provider must therefore have `autoFetchModels = OFF`; otherwise the helper must stop before save.
+- This RPC is a pinned `v3.0.22` dependency, not a permanent public API contract, and must be revalidated on upstream update.
+
+The smallest proposed repair is the separate, still-`planned` Task `V1-S1-T02`:
+
+1. Add a task-limited Company helper under `company/scripts/`; do not add a production launcher/Doctor yet.
+2. Read the running sandbox service state and accept loopback-only authenticated RPC.
+3. Verify service PID/token identity and require the pre-save Gateway to be stopped and not externally owned.
+4. Call `getConfig` without printing raw configuration.
+5. Fail closed before save if service sandbox state, auth, Provider auto-fetch state or config shape is unsafe.
+6. Change only:
+   - enabled `claude-code` profiles whose scope is neither `ccr` nor `custom`—including global, missing and unknown legacy values—to `enabled: false`;
+   - `observability.requestLogs = false`;
+   - `observability.agentAnalysis = false`;
+   - `observability.requestLogBodyCapture = "none"`.
+7. If already safe, omit save; otherwise call stock `saveConfig` with `{ applyProfile: false }`.
+8. Re-read and verify enabled global Claude Code profiles `0`, logging/analysis/body capture OFF and Provider-related configuration unchanged.
+9. Output only a compact sanitized PASS/BLOCKED/FAIL capsule; leave service stop and A3/H2 to T00.
 
 This docs update does not authorize or implement T02.
-T02 activation, product implementation and the exact candidate/instruction SHA require a separate Human Gate decision.
-T01 remains blocked.
+T02 activation and its exact candidate/instruction SHA require a separate Human Gate decision.
+T00 Attempt 2 and T01 remain blocked.
 
 ## Attempts
 
 | Attempt | Actor / session role | Candidate | Internal result | Recommendation |
 |---:|---|---|---|---|
-| 1 | A0 Internal Validator; H0–H2 and A1–A3 Human Gate Owner | `97b73a9f...` | `BLOCKED — GLOBAL_PROFILE_PERSISTENCE` | approve/implement T02, then retry T00; do not start T01 |
+| 1 | A0 Internal Validator; H0–H2 and A1–A3 Human Gate Owner | `97b73a9f...` | `BLOCKED — GLOBAL_PROFILE_PERSISTENCE` | approve Company-only T02 helper, then retry T00; do not start T01 |
 
 ## Human decision
 
