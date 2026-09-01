@@ -18,16 +18,16 @@
 ## Current
 
 - Stage: `V1-S1`
-- Active Task: `V1-S1-T02`
-- Active Task path: `company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md`
-- Status: `IN_PROGRESS`
-- Activation: `HUMAN_GATE_OWNER APPROVED_FOR_IMPLEMENTATION — 2026-09-01`
+- Active Task: `V1-S1-T00`
+- Active Task path: `company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md`
+- Status: `READY_FOR_INTERNAL_VALIDATION`
+- T02: `EXTERNAL_PASS` — wrapper-only helper syntax PASS, synthetic/mock tests 159/159
 - Repair scope: `company/** only`; CCR `packages/**` prohibited
 - T00 Attempt 1: `BLOCKED — GLOBAL_PROFILE_PERSISTENCE`
-- T00 retry blocker: `V1-S1-T02_IMPLEMENTATION`
+- T00 Attempt 2: `NOT_STARTED`; exact frozen-head A0 only authorized
 - Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
-- Goal: Company-owned helper로 pinned Stock Management RPC의 T00 cleanup/save를 fail-closed하게 수행한 뒤 exact PR head에서 T00 Attempt 2를 검증
-- Candidate product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Goal: exact frozen PR head에서 A0 preflight부터 다시 시작해 Company-owned helper의 management/config-save isolation을 검증
+- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
 
 ## Accepted execution model
@@ -185,7 +185,7 @@ Enterprise before/during/after PASS
 | Router stop as rollback | REJECTED | observed persistent client config |
 | Dual command model | ACCEPTED_AS_V1_DEFAULT | `claude` vs `company-claude` |
 | Only-opened-from-CCR + CLI-only | ACCEPTED_AS_V1_DEFAULT | System default prohibited |
-| Runtime LOCALAPPDATA sandbox | START_ISOLATION_PASS_CONFIG_SAVE_BLOCKED | V1-S1-T00 Attempt 1 |
+| Runtime LOCALAPPDATA sandbox | START_ISOLATION_PASS_CONFIG_SAVE_READY_INTERNAL | V1-S1-T00 Attempt 1 + T02 External PASS |
 | GLM onboarding | DEFERRED | serving rollout |
 | Gateway completion/stream/tool | UNVERIFIED | later V1-S1 Tasks |
 | Claude Code isolated E2E | UNVERIFIED | V1-S2 |
@@ -209,21 +209,26 @@ normal Claude Desktop
 ```text
 %APPDATA%\claude-code-router\**
 %APPDATA%\CompanyCCR\runtime-localappdata\**
+%APPDATA%\CompanyCCR\validation-workspaces\**
 CCR-scoped profile/settings
 local recovery backup outside repository
 ```
 
 ## Current open risks
 
-- Management start isolation passed one Windows Attempt, but config-save isolation is still untested.
+- Management start isolation passed one Windows Attempt, but the wrapper-assisted config-save isolation has not run internally.
 - Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
 - Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
 - Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
-- Stock Management RPC can save with `applyProfile:false`, preserving sandboxed Claude App sync without applying the cleanup profile; the Company helper implementation is active but not yet externally passed.
-- Stock save derives legacy profile mirror fields and may start Gateway/plugin/proxy/media surfaces; the helper must model the derived fields and block unsafe runtime surfaces before save.
+- The wrapper-only helper passed 159/159 external synthetic/mock tests but has not touched internal runtime data.
+- Stock Management RPC exposes neither daemon `LOCALAPPDATA` nor a revision/CAS save; fresh A2 ownership, all-writer H0 quiescence and unconditional A3 remain mandatory.
+- Canonical SQLite metadata checks do not prove DB row/schema fixed point or a write-free first open; legacy migration sources must be absent before the first Node/npm process and again before A2.
 - Real APPDATA의 stale Claude App backup, concurrent config change and indeterminate save outcome require dedicated fail-closed categories.
 - `start --no-gateway` can reuse an existing service; T00 A0/A2 plus service-identity and pre-save Gateway-state checks are mandatory.
-- Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; the helper must fail closed before save unless it is OFF.
+- A shared-PC writer could race the non-atomic state check and stock stop; H0 must close every CCR management/Desktop/UI/config writer while the dedicated validation PowerShell remains open.
+- The same dedicated 64-bit PowerShell process must survive A0 through A2–A3; losing it before A2 restarts from A0, while losing it during A2–A3 requires Human recovery.
+- The nonce validation workspace remains local for Gate review and needs later Human cleanup of that exact nonce only.
+- Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; the helper fails closed unless it is OFF.
 - The Management RPC is pinned-version source surface rather than a permanent public API and must be revalidated on upstream update.
 - Runtime sandbox may affect app discovery or child environment inheritance; CLI-only scope limits this but must be tested.
 - A Core sync-disable patch is not justified by Attempt 1 because sandbox start and Claude-3p materialization passed.
@@ -255,20 +260,14 @@ local recovery backup outside repository
 
 ## Exact next action
 
-Human Gate Owner가 `V1-S1-T02` Company-only 구현을 승인했다.
-
-현재 순서:
+T02 External PASS와 Human continuation approval이 기록됐다. 현재 승인 범위는 다음뿐이다.
 
 ```text
-1. External Codex가 company/scripts와 company test 경로에 T00 전용 helper만 구현
-2. pinned app/service identity, canonical loopback transport, stale backup, runtime side-effect surface와 concurrent config를 fail-closed 검증
-3. enabled Provider autoFetchModels가 OFF가 아니면 save 전에 중단
-4. source-derived legacy mirror를 포함한 exact allowlisted cleanup만 만들고 saveConfig(..., { applyProfile:false }) 사용
-5. synthetic/mock test와 product tree equivalence를 외부 검증
-6. final repair PR head를 동결하고 candidate/instruction SHA로 Human Gate가 승인
-7. Internal Validator가 fresh per-attempt sandbox에서 T00 Attempt 2만 수행
-8. A3/H2 invariant와 backup/sandbox cleanup 및 Enterprise smoke 확인
-9. T00 Human decision 후에만 repair PR merge와 T01 재개 판단
+1. final repair PR head 하나를 동결
+2. Human Gate가 그 exact 40-char SHA를 candidate SHA이자 instruction SHA로 승인
+3. Internal Validator가 전용 64-bit PowerShell console에서 T00 Attempt 2 A0만 수행
+4. compact sanitized A0 capsule만 반환하고 같은 console을 열어 둔 채 중단
+5. CHATGPT_ORCHESTRATOR와 Human Gate가 A0 Evidence를 검토
 ```
 
-External PASS 전에는 T00 Attempt 2와 T01을 시작하지 않는다.
+A0 검토 전 H0 또는 A1+로 진행하지 않는다. T00 Human decision `ACCEPTED` 전에는 T01을 시작하거나 repair PR을 merge하지 않는다.

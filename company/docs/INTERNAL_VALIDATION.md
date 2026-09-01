@@ -82,10 +82,15 @@ git fetch --prune origin
 git pull --ff-only origin <approved-ref>
 git checkout --detach <approved-sha>
 git show <approved-instruction-sha>:<task-path>
+git archive --format=zip --output=<approved-local-path> <approved-candidate-sha>
 git rev-parse HEAD
 git status --short
 git diff --exit-code -- <approved-paths>
 ```
+
+`git archive`는 활성 Task가 `allowed_git_actions: archive`를 명시하고 output이
+repository 밖의 Task-approved local nonce workspace일 때만 허용한다. Exact
+head의 test-only materialization이며 source 또는 Git history write가 아니다.
 
 ## 금지되는 동작
 
