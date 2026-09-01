@@ -18,13 +18,15 @@
 ## Current
 
 - Stage: `V1-S1`
-- Active Task: `V1-S1-T00`
-- Active Task path: `company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md`
-- Status: `BLOCKED`
-- Attempt 1: `BLOCKED — GLOBAL_PROFILE_PERSISTENCE`
-- Blocker: `H1_ONBOARDING_GATE_REQUIRES_FORBIDDEN_CONNECT_AGENT`
+- Active Task: `V1-S1-T02`
+- Active Task path: `company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md`
+- Status: `IN_PROGRESS`
+- Activation: `HUMAN_GATE_OWNER APPROVED_FOR_IMPLEMENTATION — 2026-09-01`
+- Repair scope: `company/** only`; CCR `packages/**` prohibited
+- T00 Attempt 1: `BLOCKED — GLOBAL_PROFILE_PERSISTENCE`
+- T00 retry blocker: `V1-S1-T02_IMPLEMENTATION`
 - Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
-- Goal: Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행해도 Enterprise Claude settings, actual Claude-3p, User/Machine env와 일반 `claude`가 변경되지 않는지 증명
+- Goal: Company-owned helper로 pinned Stock Management RPC의 T00 cleanup/save를 fail-closed하게 수행한 뒤 exact PR head에서 T00 Attempt 2를 검증
 - Candidate product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
 
@@ -217,7 +219,9 @@ local recovery backup outside repository
 - Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
 - Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
 - Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
-- Stock Management RPC can save with `applyProfile:false`, preserving sandboxed Claude App sync without applying the cleanup profile; the Company helper is not implemented yet.
+- Stock Management RPC can save with `applyProfile:false`, preserving sandboxed Claude App sync without applying the cleanup profile; the Company helper implementation is active but not yet externally passed.
+- Stock save derives legacy profile mirror fields and may start Gateway/plugin/proxy/media surfaces; the helper must model the derived fields and block unsafe runtime surfaces before save.
+- Real APPDATA의 stale Claude App backup, concurrent config change and indeterminate save outcome require dedicated fail-closed categories.
 - `start --no-gateway` can reuse an existing service; T00 A0/A2 plus service-identity and pre-save Gateway-state checks are mandatory.
 - Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; the helper must fail closed before save unless it is OFF.
 - The Management RPC is pinned-version source surface rather than a permanent public API and must be revalidated on upstream update.
@@ -251,28 +255,20 @@ local recovery backup outside repository
 
 ## Exact next action
 
-Human Gate Owner가 planned Company repair Task `V1-S1-T02`의 범위와 activation을 별도로 승인한다.
+Human Gate Owner가 `V1-S1-T02` Company-only 구현을 승인했다.
 
-승인 전:
-
-```text
-CCR packages/** 수정 금지
-wrapper helper 구현 금지
-T00 Attempt 2 시작 금지
-V1-S1-T01 재개 금지
-```
-
-승인 후 순서:
+현재 순서:
 
 ```text
 1. External Codex가 company/scripts와 company test 경로에 T00 전용 helper만 구현
-2. helper는 stock loopback Management RPC만 사용하고 DB를 직접 수정하지 않음
-3. getServiceIdentity/getGatewayStatus로 service identity 일치와 pre-save Gateway stopped 상태 확인
-4. enabled Provider autoFetchModels가 OFF가 아니면 save 전에 fail-closed
-5. getConfig 후 allowlisted cleanup만 만들고 saveConfig(..., { applyProfile:false }) 사용
-6. exact repair PR head에서 Internal Validator가 T00 Attempt 2만 수행
-7. A3/H2 invariant와 Enterprise smoke 확인
-8. T00 Human decision 후에만 repair PR merge와 T01 재개 판단
+2. pinned app/service identity, canonical loopback transport, stale backup, runtime side-effect surface와 concurrent config를 fail-closed 검증
+3. enabled Provider autoFetchModels가 OFF가 아니면 save 전에 중단
+4. source-derived legacy mirror를 포함한 exact allowlisted cleanup만 만들고 saveConfig(..., { applyProfile:false }) 사용
+5. synthetic/mock test와 product tree equivalence를 외부 검증
+6. final repair PR head를 동결하고 candidate/instruction SHA로 Human Gate가 승인
+7. Internal Validator가 fresh per-attempt sandbox에서 T00 Attempt 2만 수행
+8. A3/H2 invariant와 backup/sandbox cleanup 및 Enterprise smoke 확인
+9. T00 Human decision 후에만 repair PR merge와 T01 재개 판단
 ```
 
-현재 docs PR은 Evidence와 wrapper-only 설계만 기록하며 구현 코드를 변경하지 않는다.
+External PASS 전에는 T00 Attempt 2와 T01을 시작하지 않는다.

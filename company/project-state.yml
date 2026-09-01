@@ -25,14 +25,14 @@ workflow:
 
 current:
   stage: V1-S1
-  task_id: V1-S1-T00
-  task_path: company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md
-  status: blocked
+  task_id: V1-S1-T02
+  task_path: company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md
+  status: in_progress
 
 next:
-  task_id: V1-S1-T01
-  task_path: company/tasks/v1-s1/V1-S1-T01-GEMMA-PROVIDER-CHECK.md
-  condition: V1-S1-T00 accepted
+  task_id: V1-S1-T00
+  task_path: company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md
+  condition: V1-S1-T02 external_pass
 
 validation:
   last_internal_commit: 97b73a9f4e1fb23d406bb987d0785cefa1f99966

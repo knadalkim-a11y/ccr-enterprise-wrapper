@@ -4,17 +4,18 @@ stage: V1-S1
 title: Prove CCR runtime sandbox and Enterprise baseline invariance
 kind: spike
 status: blocked
-blocker: H1_ONBOARDING_GATE_REQUIRES_FORBIDDEN_CONNECT_AGENT
+blocker: V1-S1-T02_IMPLEMENTATION
 primary_actor: INTERNAL_VALIDATOR
 execution_mode: human_assisted
 implementation_required: false
 internal_validation: required
 github_write_allowed: false
-candidate_sha: 97b73a9f4e1fb23d406bb987d0785cefa1f99966
-instruction_sha: supplied_by_human_gate_owner
+candidate_sha: final_repair_pr_head_supplied_by_human_gate_owner
+instruction_sha: same_as_candidate
 merge_policy: not_applicable
 depends_on:
   - V1-S0-T02
+  - V1-S1-T02
 unblocks:
   - V1-S1-T01
 required_capabilities:
@@ -84,6 +85,8 @@ GitHub write by Internal Validator: NO
 
 ## Required knowledge
 
+- `company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md`
+- `company/scripts/t00-safe-config-save.mjs`
 - `company/docs/CLAUDE_CODE_ISOLATION.md`
 - `company/docs/INTERNAL_VALIDATION.md`
 - `company/docs/SECURITY.md`
@@ -96,13 +99,16 @@ GitHub write by Internal Validator: NO
 
 ```text
 Instruction SHA:
-→ Human Gate Owner가 제공
+→ Human Gate Owner가 제공하는 final repair PR head
 
 Candidate SHA:
-→ 97b73a9f4e1fb23d406bb987d0785cefa1f99966
+→ Instruction SHA와 동일한 final repair PR head
 
 Mode:
-→ validation-only two-ref exception
+→ single exact-head implementation validation
+
+Product tree equivalence:
+→ `packages/**`, `package.json`, `package-lock.json`은 validated product commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966`과 동일해야 함
 ```
 
 ## Invariant and allowed surfaces
@@ -180,7 +186,7 @@ A0 repository/service preflight
 → 모든 Claude Code/Claude Desktop process 종료
 → A1 baseline fingerprint capture
 → A2 sandbox CCR start
-→ H1 safe config cleanup/save
+→ H1 wrapper no-save preflight + safe config cleanup/save
 → A3 during/after fingerprint compare와 CCR stop
 → H2 Enterprise after smoke
 → A4 sanitized report
@@ -193,13 +199,17 @@ H0보다 먼저 authoritative fingerprint를 잡지 않는다.
 ```powershell
 git fetch --prune origin
 git show <INSTRUCTION_SHA>:company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md
-git checkout --detach 97b73a9f4e1fb23d406bb987d0785cefa1f99966
+git checkout --detach <APPROVED_CANDIDATE_SHA>
 
 $TestedCommit = git rev-parse HEAD
 git status --short
 
 $Cli = "packages/cli/dist/main/cli.js"
 $CliExists = Test-Path $Cli
+$ServiceStateFile = Join-Path $env:APPDATA "claude-code-router\service.json"
+$ServiceStateAbsentBeforeStart = -not (Test-Path -LiteralPath $ServiceStateFile)
+$ClaudeAppBackupFile = Join-Path $env:APPDATA "claude-code-router\claude-app-gateway-backup.json"
+$ClaudeAppBackupAbsentBeforeStart = -not (Test-Path -LiteralPath $ClaudeAppBackupFile)
 
 node --version
 npm --version
@@ -208,6 +218,11 @@ node -p "process.arch"
 
 $TestedCommit
 $CliExists
+$ServiceStateAbsentBeforeStart
+$ClaudeAppBackupAbsentBeforeStart
+
+git diff --exit-code 97b73a9f4e1fb23d406bb987d0785cefa1f99966 HEAD -- packages package.json package-lock.json
+$ProductTreeEquivalenceExit = $LASTEXITCODE
 ```
 
 진행 조건:
@@ -218,6 +233,9 @@ working tree clean
 process.platform = win32
 CLI exists = True
 CCR service stopped
+ServiceStateAbsentBeforeStart = True
+ClaudeAppBackupAbsentBeforeStart = True
+ProductTreeEquivalenceExit = 0
 ```
 
 CCR service가 실행 중이면 Task에 기록된 stock `stop`만 수행한 뒤 다시 확인한다.
@@ -257,7 +275,11 @@ Claude clients closed: YES / NO
 ```powershell
 $EnterpriseSettings = Join-Path $env:USERPROFILE ".claude\settings.json"
 $RealClaude3p = Join-Path $env:LOCALAPPDATA "Claude-3p"
-$SandboxLocalAppData = Join-Path $env:APPDATA "CompanyCCR\runtime-localappdata"
+$AttemptNonce = [Guid]::NewGuid().ToString("N")
+$SandboxLocalAppData = Join-Path $env:APPDATA "CompanyCCR\runtime-localappdata\$AttemptNonce"
+if (Test-Path -LiteralPath $SandboxLocalAppData) {
+  throw "Fresh sandbox path unexpectedly exists."
+}
 $SandboxClaude3p = Join-Path $SandboxLocalAppData "Claude-3p"
 $ClaudeAppConfigId = "8f69f2f1-3275-4ad8-9317-4aa7e972f311"
 
@@ -280,6 +302,14 @@ function New-Claude3pTargets([string]$Root) {
 
 $RealClaude3pTargets = New-Claude3pTargets $RealClaude3p
 $SandboxClaude3pTargets = New-Claude3pTargets $SandboxClaude3p
+$SandboxClaude3pTargetCountBefore = @(
+  $SandboxClaude3pTargets |
+    Where-Object { Test-Path -LiteralPath $_.Path -PathType Leaf }
+).Count
+
+if ($SandboxClaude3pTargetCountBefore -ne 0) {
+  throw "Fresh sandbox target surface is not empty."
+}
 
 $ManagedEnvKeys = @(
   "CLAUDE_CONFIG_DIR",
@@ -387,10 +417,12 @@ try {
 $ParentLocalAppDataRestored = $env:LOCALAPPDATA -eq $OriginalLocalAppData
 $ParentProcessEnvAfterStart = Get-EnvFingerprint "Process" $ProcessBoundaryKeys
 $ParentProcessEnvRestored = $Baseline.ProcessEnv -eq $ParentProcessEnvAfterStart
+$ServiceStateCreated = Test-Path -LiteralPath $ServiceStateFile
 
 $StartExit
 $ParentLocalAppDataRestored
 $ParentProcessEnvRestored
+$ServiceStateCreated
 ```
 
 기대 결과:
@@ -399,39 +431,54 @@ $ParentProcessEnvRestored
 StartExit = 0
 ParentLocalAppDataRestored = True
 ParentProcessEnvRestored = True
+ServiceStateCreated = True
 ```
 
 Management URL/token은 사내 PC 안에서만 사용한다.
 `StartExit != 0`이면 `RUNTIME_SANDBOX_INCOMPATIBLE`로 중단한다.
 
-## H1 — [HUMAN_GATE_OWNER] Remove global profile side effects and save
+## H1 — [INTERNAL_VALIDATOR] Wrapper no-save preflight and safe config save
 
-로컬 Management UI에서 수행한다.
+Management UI를 열지 않는다. 먼저 default no-save preflight를 실행하고, PASS일 때만 explicit apply를 실행한다.
 
-1. 활성 `System default` / global Claude Code profile을 모두 제거하거나 비활성화한다.
-2. 이 Task에서는 새 Claude Code profile을 만들지 않는다.
-3. `Request logs`를 OFF로 둔다.
-4. `Agent observability`를 OFF로 둔다.
-5. Provider endpoint/key/model/protocol은 수정하지 않는다.
-6. 설정을 저장한다.
-7. `Connect agent`, `Let's start`, model request를 수행하지 않는다.
+```powershell
+node company/scripts/t00-safe-config-save.mjs
+$PreflightExit = $LASTEXITCODE
 
-설정 저장 과정에서 Gateway가 내부적으로 시작되더라도 model request를 보내지 않는다.
-모든 side effect는 sandbox process 안에 머물러야 한다.
+if ($PreflightExit -ne 0) {
+  throw "T00 wrapper preflight blocked; do not apply."
+}
 
-Internal Validator에 반환:
+node company/scripts/t00-safe-config-save.mjs --apply
+$ApplyExit = $LASTEXITCODE
 
-```text
-Enabled global Claude Code profiles after save: 0
-New profile created: NO
-Request logs: OFF
-Agent observability: OFF
-Provider changed: NO
-Connect agent executed: NO
-Let's start executed: NO
+$PreflightExit
+$ApplyExit
 ```
 
-글로벌 프로필을 제거할 수 없거나 source/runtime DB 직접 편집이 필요하면 중단한다.
+진행 조건:
+
+```text
+PreflightExit = 0
+preflight capsule APPLY=N
+ApplyExit = 0
+apply capsule APPLY=P
+SERVICE=P
+GW_PRE=STOP
+GLOBAL=0
+LOGS=OFF
+ANALYSIS=OFF
+BODY=NONE
+PROVIDER=SAME
+AUTOFETCH=OFF
+RAW=NO
+```
+
+`APPLY=SKIP`이면 helper 동작은 안전하지만 config-save isolation을 이번 Attempt에서 실행하지 못한 것이다.
+안전 상태를 일부러 되돌리거나 global profile을 만들지 말고 `BLOCKED_CONFIG_SAVE_NOT_EXERCISED`로 중단한다.
+
+Helper가 `BLOCKED_*`, `RPC_FAILURE`, `UNEXPECTED_CONFIG_DIFF` 또는 `POSTCONDITION_FAILURE`를 반환하면 source/runtime DB를 수정하거나 UI로 우회하지 말고 중단한다.
+Helper 외에 `Connect agent`, `Let's start`, profile apply, Provider probe 또는 model request를 수행하지 않는다.
 
 ## A3 — [INTERNAL_VALIDATOR] Compare during, stop, and compare after
 
@@ -464,9 +511,17 @@ $SandboxClaude3pTargetCount = @(
 ).Count
 $SandboxClaude3pConfigMaterialized =
   $SandboxClaude3pTargetCount -eq $SandboxClaude3pTargets.Count
+$ClaudeAppBackupExistsDuring = Test-Path -LiteralPath $ClaudeAppBackupFile
 
 node $Cli stop
 $StopExit = $LASTEXITCODE
+
+$SandboxClaude3pTargetCountAfterStop = @(
+  $SandboxClaude3pTargets |
+    Where-Object { Test-Path -LiteralPath $_.Path -PathType Leaf }
+).Count
+$ClaudeAppBackupAbsentAfterStop = -not (Test-Path -LiteralPath $ClaudeAppBackupFile)
+$ServiceStateAbsentAfterStop = -not (Test-Path -LiteralPath $ServiceStateFile)
 
 $After = Get-CurrentInvariantState
 
@@ -492,6 +547,9 @@ User env during/after = SAME
 Machine env during/after = SAME
 normal claude resolution during/after = SAME
 sandbox Claude-3p config materialized = TRUE
+sandbox target count before/during/after stop = 0 / 3 / 0
+Claude App backup absent before / exists during / absent after stop = TRUE / TRUE / TRUE
+service state absent after stop = TRUE
 StopExit = 0
 ProductDiffExit = 0
 final git status = clean
@@ -512,37 +570,45 @@ Manual settings/env recovery required: NO
 
 수동 복구가 필요했다면 최종 결과는 FAIL이다.
 
-## Acceptance criteria
+## Acceptance criteria — Attempt 2
 
-- [x] exact instruction SHA 기록
-- [x] exact candidate SHA 기록
-- [x] working tree before test clean
-- [x] Enterprise baseline smoke PASS
-- [x] local recovery backup 상태 기록
-- [x] all Claude clients closed before fingerprint
-- [x] baseline captured after smoke and shutdown
-- [x] service starts with process-local sandbox `LOCALAPPDATA`
-- [x] parent PowerShell `LOCALAPPDATA` restored immediately
-- [x] parent Process env boundary restored immediately
+- [ ] exact instruction SHA 기록
+- [ ] exact candidate SHA 기록
+- [ ] candidate/instruction/final PR head 동일
+- [ ] working tree before test clean
+- [ ] product tree equivalence exit `0`
+- [ ] Enterprise baseline smoke PASS
+- [ ] local recovery backup 상태 기록
+- [ ] all Claude clients closed before fingerprint
+- [ ] baseline captured after smoke and shutdown
+- [ ] service starts with process-local sandbox `LOCALAPPDATA`
+- [ ] parent PowerShell `LOCALAPPDATA` restored immediately
+- [ ] parent Process env boundary restored immediately
+- [ ] wrapper no-save preflight PASS
+- [ ] wrapper apply executed with `APPLY=P`
 - [ ] enabled global Claude Code profiles after save = `0`
 - [ ] Request logs OFF
 - [ ] Agent observability OFF
-- [x] Provider unchanged
-- [x] actual Enterprise settings during/after = SAME
-- [x] actual Claude-3p CCR config surface during/after = SAME
-- [x] Process env during/after = SAME
-- [x] User env during/after = SAME
-- [x] Machine env during/after = SAME
-- [x] normal `claude` resolution during/after = SAME
-- [x] sandbox Claude-3p config files materialized
-- [x] stop exit `0`
-- [x] Enterprise after smoke PASS
-- [x] manual rollback not required
-- [x] product diff exit `0`
-- [x] final Git status clean
-- [x] secrets/raw fingerprints exported = NO
-- [x] Git write performed = NO
-- [x] next Task started = NO
+- [ ] Request body capture NONE
+- [ ] Provider unchanged
+- [ ] actual Enterprise settings during/after = SAME
+- [ ] actual Claude-3p CCR config surface during/after = SAME
+- [ ] Process env during/after = SAME
+- [ ] User env during/after = SAME
+- [ ] Machine env during/after = SAME
+- [ ] normal `claude` resolution during/after = SAME
+- [ ] sandbox Claude-3p config files materialized
+- [ ] fresh sandbox target count before/during/after stop = `0 / 3 / 0`
+- [ ] Claude App backup lifecycle = `ABSENT / PRESENT / ABSENT`
+- [ ] service state absent after stop
+- [ ] stop exit `0`
+- [ ] Enterprise after smoke PASS
+- [ ] manual rollback not required
+- [ ] product diff exit `0`
+- [ ] final Git status clean
+- [ ] secrets/raw fingerprints exported = NO
+- [ ] Git write performed = NO
+- [ ] next Task started = NO
 
 ## Result rules
 
@@ -577,6 +643,7 @@ BLOCKED
 - Enterprise invariant changes
 - secret/raw settings must be exported to diagnose
 - model request would be required
+- wrapper apply returns `APPLY=SKIP`
 
 ## Failure classification
 
@@ -588,6 +655,7 @@ BLOCKED
 - `CLAUDE_APP_CONFIG_PERSISTENCE`
 - `PROCESS_ENVIRONMENT_LEAK`
 - `LOGGING_SAFETY`
+- `BLOCKED_CONFIG_SAVE_NOT_EXERCISED`
 - `SHUTDOWN`
 - `PRODUCT_DIFF`
 - `UNKNOWN`
@@ -604,9 +672,12 @@ Environment alias:
 
 A0:
 - candidate match:
+- candidate/instruction/PR head same:
 - working tree clean:
+- product tree equivalence:
 - CLI exists:
 - CCR service stopped:
+- service state absent before start:
 
 H0:
 - Enterprise CLI baseline:
@@ -624,12 +695,17 @@ A2:
 - start exit code:
 - parent LOCALAPPDATA restored:
 - parent Process env restored:
+- fresh service state created:
 
 H1:
+- no-save preflight / exit code:
+- apply / exit code:
+- sanitized helper capsule:
 - enabled global Claude Code profiles:
 - new profile created: NO
 - Request logs:
 - Agent observability:
+- Request body capture:
 - Provider changed: NO
 - Connect agent executed: NO
 - Let's start executed: NO
@@ -643,6 +719,7 @@ A3 during:
 - normal claude resolution: SAME / CHANGED
 - sandbox Claude-3p config materialized: YES / NO
 - sandbox target count: 0..3
+- Claude App backup exists during: YES / NO
 
 A3 after:
 - CCR stop / exit code:
@@ -652,6 +729,9 @@ A3 after:
 - User env: SAME / CHANGED
 - Machine env: SAME / CHANGED
 - normal claude resolution: SAME / CHANGED
+- sandbox target count after stop:
+- Claude App backup absent after stop:
+- service state absent after stop:
 - product diff / exit code:
 - final git status:
 
