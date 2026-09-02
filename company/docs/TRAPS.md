@@ -34,7 +34,8 @@ Git·문서·에이전트 제어는 native Termux에서 계속 수행하고, nat
 - Root cause: `UNKNOWN` — 단일 관찰이며 재현되지 않음
 - Avoid: `npm ci` exit code와 함께 실제 typecheck/build/runtime 명령을 반드시 실행해 설치 무결성을 확인함
 - Detect: `Test-Path node_modules\.bin\tsc.cmd`가 `False`이거나 후속 npm script가 설치 도구를 찾지 못함
-- Recovery: 제품 파일을 수정하지 않고 `node_modules`만 삭제한 뒤 clean `npm ci`를 한 번 재실행하고 최초/재시도 결과를 모두 기록함
+- Historical V1-S0 recovery: 제품 파일을 수정하지 않고 `node_modules`만 삭제한 뒤 clean `npm ci`를 한 번 재실행하고 최초/재시도 결과를 모두 기록했음
+- Current Task rule: V1-S1-T00 A0의 single nonce/one-install 계약에서는 `node_modules` 삭제나 자동 retry를 하지 않고 `BLOCKED`로 반환한다. 재시도는 Human review와 새 exact-head/Attempt 계약을 따른다.
 - Evidence: `V1-S0-T01` Attempt 2, tested commit `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Recheck when: 다음 Windows clean install validation 또는 npm/Node/CCR dependency 조합 변경 시
 

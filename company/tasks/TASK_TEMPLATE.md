@@ -11,6 +11,8 @@ internal_validation: required
 github_write_allowed: false
 candidate_sha: TBD
 instruction_sha: TBD
+# candidate_role: validation_overlay
+# tested_product_sha: exact SHA required when candidate_role is validation_overlay
 merge_policy: not_applicable
 depends_on: []
 required_capabilities: []
@@ -73,8 +75,17 @@ merge_policy:
 ## Candidate contract
 
 ```text
+Canonical repository URL:
+Candidate fetch ref:
+Task path:
 Candidate SHA:
 Instruction SHA:
+Candidate role: implementation / validation / validation_overlay
+Tested product SHA (validation_overlay only):
+Authorized phase:
+Merge policy:
+Required capability matrix:
+Execution mode:
 Product tree equivalence:
 Internal validation target:
 ```
@@ -84,7 +95,9 @@ Internal validation target:
 1. 구현 Task는 코드와 검증 지침이 함께 들어 있는 PR head SHA 하나를 내부 candidate로 사용한다.
 2. 내부 검증이 필요한 코드 PR은 `INTERNAL_PASS` 전 merge하지 않는다.
 3. Validation-only Task는 `candidate_sha`와 `instruction_sha`가 다를 수 있으나, 둘 다 handoff에 기록하고 제품 경로 동등성을 확인한다.
-4. Internal Validator는 branch 이름이나 최신 상태를 추측하지 않고 Human Gate Owner가 승인한 exact SHA만 checkout한다.
+4. Internal Validator는 branch 이름이나 최신 상태를 추측하지 않고 Human Gate Owner가 승인한 canonical URL/ref/SHA/phase만 사용한다.
+5. PR ref가 기본 fetchspec에 없을 수 있으므로 Task-approved disposable repository에 exact ref를 fetch하고 shared checkout은 변경하지 않는다.
+6. `validation_overlay`는 Human이 명시적으로 승인한 경우에만 사용하며 exact tested product SHA, protected-path equivalence와 full tested-product build plane을 기록한다.
 
 ## Required knowledge
 
@@ -104,7 +117,7 @@ Internal validation target:
 |---:|---|---|---|
 | 1 | `CHATGPT_ORCHESTRATOR` | Task·Acceptance Criteria·Evidence 형식 설계 | Human Gate Owner 승인 |
 | 2 | `EXTERNAL_CODEX` | 구현이 필요할 때만 branch/PR 작성 | Candidate SHA 반환 |
-| 3 | `INTERNAL_VALIDATOR` | exact candidate pull/checkout 후 test-only 검증 | Sanitized evidence 반환 |
+| 3 | `INTERNAL_VALIDATOR` | disposable repository에서 exact ref/SHA 확인 후 test-only 검증 | Sanitized evidence 반환 |
 | 4 | `HUMAN_GATE_OWNER` | secret/UI/정책 작업과 최종 Gate 결정 | 다음 Task 승인 또는 RETRY |
 
 사용하지 않는 Actor 단계는 `NOT_REQUIRED`로 명시한다.
@@ -129,8 +142,8 @@ Internal validation target:
 ## [INTERNAL_VALIDATOR] Preflight / validation steps
 
 1. 역할을 `INTERNAL_VALIDATOR`로 선언한다.
-2. 승인된 `instruction_sha`의 Task를 읽고 `candidate_sha`를 detached checkout한다.
-3. branch/HEAD/working tree와 required capability를 확인한다.
+2. 승인된 canonical URL의 exact fetch ref를 Task-approved disposable repository에 가져와 `instruction_sha`/`candidate_sha`와 일치하는지 확인한다.
+3. 승인된 Task/phase와 required capability를 확인한다.
 4. 아래에 문서화된 명령과 UI 단계만 수행한다.
 5. source, dependency, Task, STATUS, Gate, GitHub를 수정하지 않는다.
 6. 결과를 Sanitized Evidence 형식으로 Human Gate Owner에게 반환하고 종료한다.
@@ -162,7 +175,8 @@ Internal Validator는 Human Step 직전에 멈추고, 완료 신호를 받은 �
 - [ ] 검증 질문에 `PASS / FAIL / BLOCKED`로 답함
 - [ ] 제품 source와 lockfile 무변경 또는 승인된 구현 diff만 존재
 - [ ] secret/raw internal evidence 외부 반출 없음
-- [ ] Internal Validator의 Git/GitHub write 없음
+- [ ] Internal Validator가 요청·관찰한 GitHub/remote write, source/history authoring, shared checkout mutation 범위를 사실대로 기록
+- [ ] disposable local Git/workspace write, runtime/config/service action과 관찰하지 않은 child side effect를 분리해 기록
 - [ ] 다음 Task 미시작
 
 ## Stop conditions
@@ -181,19 +195,27 @@ Task ID:
 Session role:
 Candidate SHA:
 Instruction SHA:
-Environment alias:
+Canonical repository URL verified: YES / NO
+Candidate fetch ref verified: YES / NO
+Authorized phase:
+Environment alias: <sanitized Human-supplied label; not hostname/user/device ID>
 Capability matrix:
 Commands/UI steps performed:
 Exit codes / PASS / FAIL / BLOCKED:
 Protocol/provider/model aliases:
 Failure classification:
 Reproducibility:
-Product diff:
-Final git status:
+Product diff / fingerprint:
+Existing shared checkout final status: NOT_APPLICABLE / CLEAN / DIRTY
 Human steps completed:
 Sanitized observation:
-Secrets/raw evidence exported: NO
-Git write performed: NO
+Secrets/raw evidence included in sanitized handoff: NO
+Agent-requested GitHub/remote write: NONE / YES
+Agent-authored source/history: NONE / YES
+Agent-targeted existing shared checkout mutation: NONE / YES
+Disposable local Git/workspace write: YES / NO
+Agent-requested runtime/config/service action: NONE / YES
+Unobserved child side effects: NOT_APPLICABLE / NOT_OBSERVED / NOT_CLAIMED
 Next Task started: NO
 ```
 

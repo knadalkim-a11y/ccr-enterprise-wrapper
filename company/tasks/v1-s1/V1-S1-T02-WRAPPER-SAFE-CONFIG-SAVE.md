@@ -64,18 +64,23 @@ Date: 2026-09-01
 Authority: HUMAN_GATE_OWNER
 Decision: CONTINUE_AS_T00_VALIDATION_ONLY_HELPER
 Standalone production safety claim: PROHIBITED
-Fresh A2 spawn + quiescence + unconditional A3: REQUIRED
+Runtime invariants at that decision: fresh service ownership + relevant-writer quiescence + unconditional cleanup
+Status of old A2/A3 labels: RETIRED_BY_A0_ONLY_REPAIR
 ```
 
-The final Human decision remains pending until External PASS, exact-head T00 Attempt 3, and Human Gate review. Attempt 2 stopped at A0 with `BLOCKED_TOOLCHAIN_IDENTITY`; the helper itself remains internally unexecuted.
+The final Human decision remains pending until External PASS, a later exact-head T00
+runtime Attempt, and Human Gate review. Attempt 2 stopped at A0 with
+`BLOCKED_TOOLCHAIN_IDENTITY`; the helper itself remains internally unexecuted. The
+current repaired head authorizes A0 install/typecheck/build only and does not execute
+this helper.
 
 ## Validation question
 
-> Company-owned helper가 Stock CCR `v3.0.22`의 authenticated loopback Management RPC만 사용해 CCR source와 runtime DB를 직접 수정하지 않고 T00 H1 안전 상태를 저장할 수 있는가?
+> Company-owned helper가 Stock CCR `v3.0.22`의 authenticated loopback Management RPC만 사용해 CCR source와 runtime DB를 직접 수정하지 않고 future T00-approved 안전 상태를 저장할 수 있는가?
 
 ## Why now
 
-V1-S1-T00 Attempt 1은 management start isolation을 통과했지만 H1 cleanup/save에 도달하지 못해 `BLOCKED`됐다.
+V1-S1-T00 Attempt 1은 management start isolation을 통과했지만 required cleanup/save에 도달하지 못해 `BLOCKED`됐다.
 Stock UI의 unfinished onboarding에서는 forbidden `Connect agent` 없이 required cleanup을 수행할 수 없다.
 Human Gate는 CCR source patch를 거부했고 Company-owned wrapper 경로를 선택했다.
 
@@ -102,7 +107,7 @@ Human Gate는 CCR source patch를 거부했고 Company-owned wrapper 경로를 �
 - `getServiceIdentity`만으로 pinned binary/config root를 증명할 수 없으므로 `getAppInfo`의 name/version/platform/config/data paths를 함께 검증해야 한다.
 - Management RPC는 pinned `v3.0.22` source dependency이며 영구 public API로 간주하지 않는다.
 - `NODE_DEBUG`는 Node startup 전에 제거해야 한다. Helper 내부에서 값을 지우는 것은 HTTP header/body debug를 안전하게 끄는 방법이 아니다.
-- Node 24의 coverage/compile-cache/warning redirect 환경변수는 helper code보다 먼저 또는 process exit 때 파일을 만들 수 있고, npm lifecycle은 `npm_config_node_options`/`npm_config_script_shell`을 해석한다. T00은 첫 npm/Node 전에 이 surface를 차단하고 A2 직전에 다시 확인한다.
+- Node 24의 coverage/compile-cache/warning redirect 환경변수는 helper code보다 먼저 또는 process exit 때 파일을 만들 수 있고, npm lifecycle은 `npm_config_node_options`/`npm_config_script_shell`을 해석한다. Future T00 runtime procedure는 첫 runtime Node/service 전과 helper spawn 직전에 이 surface를 확인한다.
 - `CCR_WEB_AUTH_TOKEN`/`CCR_WEB_ALLOWED_ORIGINS`는 management auth/CORS 경계를 바꾸며, `CCR_MODEL_CATALOG_PATH`와 legacy `CCR_MODELS_JSON_PATH`는 정상 Claude App sync가 읽는 model catalog를 바꾼다. 모두 inherited override로 간주한다.
 - Local-agent Provider는 load/save 정규화 중 host의 Grok environment/version file/account endpoint를 읽을 수 있으므로 이 좁은 validation helper에서는 magic local-agent API key를 가진 모든 Provider를 save 전에 차단한다.
 
@@ -114,7 +119,11 @@ Production `company-claude` launcher, installer, setup 또는 Doctor로 일반�
 
 Stock `v3.0.22` RPC는 daemon이 실제로 상속한 `LOCALAPPDATA`를 노출하지 않고 `saveConfig`에 revision/CAS를 제공하지 않는다.
 따라서 helper 단독으로 sandbox inheritance나 원자적 compare-and-save를 증명한다고 주장하지 않는다.
-T00 A0/A2가 absent state에서 같은 PowerShell이 sandbox `LOCALAPPDATA`로 fresh daemon을 시작한 사실을 증명하고, 모든 CCR management/client writer를 quiesce하며, A3가 결과와 관계없이 actual Enterprise/Claude-3p invariant와 cleanup을 검증하는 범위에서만 사용한다.
+Future T00 runtime instructions가 absent state에서 sandbox `LOCALAPPDATA`로 fresh
+daemon을 시작한 사실을 증명하고, relevant CCR management/client writer를 quiesce하며,
+결과와 관계없이 actual Enterprise/Claude-3p invariant와 cleanup을 검증하는 범위에서만
+사용한다. 기존 A0–A3 same-PowerShell 계약은 retired됐으며 새 runtime controller는
+A0 Evidence 뒤 별도 exact head에서 검토한다.
 또한 T00은 daemon 시작 직전에 whole legacy Windows config directory와 active/home legacy JSON, legacy API-key DB/sidecars 및 onboarding marker가 absent인지 metadata-only로 확인해야 한다. Canonical config directory, `config.sqlite`와 optional sidecars의 bounded/non-reparse metadata 검사는 DB row/schema fixed point나 첫 open의 무기록성을 증명하지 않으며, helper-only 검사는 import/migration 뒤라 너무 늦다.
 
 이 제한은 CCR source를 수정하지 않는 Human 결정의 명시적 trade-off다.
@@ -150,7 +159,7 @@ T00 A0/A2가 absent state에서 같은 PowerShell이 sandbox `LOCALAPPDATA`로 f
 - Loopback-only authenticated Management RPC.
 - Fail-closed preflight and exact allowlisted config transform.
 - Compact sanitized output for the keyboard-only Evidence boundary.
-- Exact repair PR head handoff to T00 Attempt 3 after Attempt 2 A0 diagnostic repair.
+- Exact repaired PR head handoff to T00 Attempt 3 A0 only; helper execution remains deferred.
 
 Role-owned canonical transition after External PASS:
 
@@ -180,9 +189,9 @@ The orchestrator transition does not expand the helper implementation scope and 
 
 ## Implementation contract
 
-0. Invoke only inside T00 after A0 proves no service state/backup and no legacy import/migration source, H0 closes every CCR/Claude writer, and A2 rechecks those metadata-only guards before freshly starting the daemon with sandbox `LOCALAPPDATA` from the exact archived-source working directory. The helper does not independently attest daemon `LOCALAPPDATA`, legacy pre-start absence, DB row/schema fixed point, or runtime cwd and is not a production launcher.
+0. Invoke only inside a future Human-approved T00 runtime procedure after that procedure proves no pre-existing service/backup or legacy import/migration source, quiesces relevant same-account CCR/Claude writers, and rechecks those guards immediately before freshly starting the daemon with sandbox `LOCALAPPDATA` from the exact archived-source working directory. The helper does not independently attest daemon `LOCALAPPDATA`, legacy pre-start absence, DB row/schema fixed point, or runtime cwd and is not a production launcher.
 1. Accept only no argument or one exact `--apply`; invalid arguments return a fixed usage category without echoing input. Default mode is a **no-`saveConfig` preflight**, not an inert/read-only claim.
-2. Require Windows and an absolute `APPDATA`. Reject `CCR_INTERNAL_APP_DATA_DIR`, `CCR_INTERNAL_HOME_DIR`, `CCR_INTERNAL_USER_DATA_DIR`, `CCR_GATEWAY_ENTRY`, `CCR_MODELS_JSON_PATH`, `CCR_MODEL_CATALOG_PATH`, `CCR_NODE_BIN`, `CCR_UPSTREAM_PROXY_URL`, `CCR_WEB_ALLOWED_ORIGINS`, `CCR_WEB_AUTH_TOKEN`, `NODE_COMPILE_CACHE`, `NODE_DEBUG`, `NODE_OPTIONS`, `NODE_REDIRECT_WARNINGS`, `NODE_V8_COVERAGE`, `npm_config_node_options` and `npm_config_script_shell`. Never fall back to restored `LOCALAPPDATA`. T00 must prove these values are absent before the first npm/Node process and again immediately before A2; helper-side rejection is defense in depth, not a claim that Node startup artifacts can be prevented from JavaScript.
+2. Require Windows and an absolute `APPDATA`. Reject `CCR_INTERNAL_APP_DATA_DIR`, `CCR_INTERNAL_HOME_DIR`, `CCR_INTERNAL_USER_DATA_DIR`, `CCR_GATEWAY_ENTRY`, `CCR_MODELS_JSON_PATH`, `CCR_MODEL_CATALOG_PATH`, `CCR_NODE_BIN`, `CCR_UPSTREAM_PROXY_URL`, `CCR_WEB_ALLOWED_ORIGINS`, `CCR_WEB_AUTH_TOKEN`, `NODE_COMPILE_CACHE`, `NODE_DEBUG`, `NODE_OPTIONS`, `NODE_REDIRECT_WARNINGS`, `NODE_V8_COVERAGE`, `npm_config_node_options` and `npm_config_script_shell`. Never fall back to restored `LOCALAPPDATA`. The future T00 runtime controller must prove these values are absent before its first runtime Node/service process and again immediately before helper spawn; helper-side rejection is defense in depth, not a claim that Node startup artifacts can be prevented from JavaScript.
 3. Read only `%APPDATA%\claude-code-router\service.json`, with file-type and size limits. Require the pinned exact state shape, positive numeric PID, live process, `profileManaged === false`, `startGateway === false`, nonempty service token, valid `startedAt`, and no unexpected keys.
 4. Require `%APPDATA%\claude-code-router\claude-app-gateway-backup.json` to be absent before any RPC that can save.
 5. Accept only a canonical `http://127.0.0.1:<explicit-port>/?ccr_web_token=<one-nonempty-value>` URL: root path, no userinfo, fragment, extra/duplicate query or DNS hostname. Send the token only as `x-ccr-web-auth` to fixed `/api/ccr/rpc`.
@@ -202,14 +211,14 @@ The orchestrator transition does not expand the helper implementation scope and 
 16. Without `--apply`, report only whether a change is required and the target safe state; do not claim the current global count is already zero and do not call `saveConfig`.
 17. If `--apply` is requested but no change is required, return `APPLY=SKIP|CHANGE=N` without save. T00 must classify this as config-save coverage not exercised, not PASS.
 18. Check the configured loopback gateway and core TCP ports immediately before the final snapshot sequence; occupied or ambiguous ports block.
-19. After the port checks, re-read the raw service-state file and require exact equality, then repeat service identity, stopped Gateway, onboarding boolean and `getConfig`, re-run all guards, and check backup absence again. Require the second config to be canonically equal to the initial snapshot. Stock RPC has no revision/CAS, so T00 quiescence is mandatory and this checkpoint is not described as an atomic guarantee.
+19. After the port checks, re-read the raw service-state file and require exact equality, then repeat service identity, stopped Gateway, onboarding boolean and `getConfig`, re-run all guards, and check backup absence again. Require the second config to be canonically equal to the initial snapshot. Stock RPC has no revision/CAS, so relevant same-account writer quiescence in the future T00 runtime procedure is mandatory and this checkpoint is not described as an atomic guarantee.
 20. Call exactly one explicit mutation RPC: `saveConfig([fullNextConfig, { applyProfile: false }])`. Read RPC handlers may initialize/migrate Stock storage, so “one mutation RPC” is not a claim that no internal storage write can occur.
 21. Never retry a mutation. Any timeout, disconnect, malformed/oversized response or RPC error after save dispatch is `INDETERMINATE_SAVE` with `SAVE=UNKNOWN`; it is not a safe pre-save block.
 22. After a confirmed save response, call `getConfig([])`, `getOnboardingFinished([])` and `getGatewayStatus([])`. Require returned and re-read config exact-equal to the expected target, onboarding unchanged, and post Gateway state still `stopped` with configured loopback endpoints, no PID/external ownership/network endpoint/error/start timestamp. Any `running`, `starting` or `error` state is a post-save failure.
 23. Do not call `setOnboardingFinished`, `applyProfile`, `applyClaudeAppGateway`, `openProfile`, Gateway controls, Provider probes, connectivity checks, model catalog methods or model APIs.
-24. Gateway start is prohibited. The pinned source proof and exact profile-only diff must keep the Stock save on `gatewayService.updateConfig`; any observed start is `POSTCONDITION_FAILURE`, followed by unconditional T00 A3 cleanup. The helper must not invoke or send a request through the Gateway.
+24. Gateway start is prohibited. The pinned source proof and exact profile-only diff must keep the Stock save on `gatewayService.updateConfig`; any observed start is `POSTCONDITION_FAILURE`, followed by the future T00 runtime controller's unconditional cleanup/invariance step. The helper must not invoke or send a request through the Gateway.
 25. Never print, persist or return the management URL/token, service token, full config, Provider fields, API keys, model IDs, paths, raw RPC bodies or server error text.
-26. Do not stop the service after save or an indeterminate save; T00 A3 always owns fingerprint, stock stop, captured-PID death proof and cleanup. T00 must run A3 for every helper result, especially `SAVE=UNKNOWN`.
+26. Do not stop the service after save or an indeterminate save; the future T00 runtime controller's unconditional cleanup/invariance step owns fingerprint, stock stop, captured-PID death proof and cleanup. That step is required for every helper result, especially `SAVE=UNKNOWN`.
 27. On any ambiguity observed before mutation dispatch, output a fixed `BLOCKED` category and guarantee no save dispatch. Client-side snapshot checks do not claim to replace unavailable server-side CAS.
 28. Output exactly one compact sanitized line and a documented process exit code.
 
@@ -297,7 +306,8 @@ Base commit: 05bd8fd14048c2544a31deae99bafac4d2820ece
 Implementation scope: company/scripts + company/tests + this Task only
 node --check: PASS
 node --test: PASS — 159/159
-Product tree equivalence: PASS
+Protected CCR source/build/package path equivalence: PASS
+Candidate/full-head build equivalence: NOT_TESTED / NOT_CLAIMED
 CCR packages/** changed: NO
 Secrets/raw internal evidence used: NO
 Internal runtime validation: NOT_STARTED
@@ -333,7 +343,7 @@ They must cover:
 - [ ] validation-only scope and unavailable daemon-LOCALAPPDATA/CAS attestation limitation recorded
 - [ ] default invocation makes no `saveConfig` call
 - [ ] apply requires explicit flag
-- [ ] no pre-existing service and fresh A2 state/PID proved by T00 A0/A2
+- [ ] no pre-existing service and fresh state/PID proved by a future approved T00 runtime controller
 - [ ] pinned app identity/config root verified
 - [ ] stale Claude App backup fail-closed
 - [ ] loopback HTTP/auth-header/service identity/Gateway pre-state fail-closed
@@ -354,7 +364,7 @@ They must cover:
 - [ ] no forbidden or explicit Gateway-control RPC invoked
 - [ ] synthetic/mock tests pass
 - [ ] compact sanitized output only
-- [ ] T00 Attempt 3 is the only newly authorized internal validation; A0 only until Gate review
+- [ ] T00 Attempt 3 source verification + A0 is the only newly authorized internal validation; helper runtime remains `NOT_STARTED`
 - [ ] T01 remains blocked
 
 ## Stop conditions
@@ -364,14 +374,14 @@ They must cover:
 - Management endpoint is not loopback/authenticated.
 - Pinned app identity/config root or fresh service state cannot be proven.
 - A stale Claude App backup exists.
-- T00 cannot prove the service was stopped before A2 or service identity does not match.
+- The future T00 runtime procedure cannot prove no pre-existing service and fresh service ownership, or service identity does not match.
 - Gateway is already running or externally owned before save.
 - Gateway/core addresses, ports, proxy, media, plugin, Tool Hub or MCP startup surfaces are unsafe.
 - Request logs/agent analysis/body capture are not already `OFF/OFF/NONE`, or an enabled Router script would be prepared.
 - Node startup/debug, Gateway executable or inherited upstream override env is present.
 - Full config round-trip cannot preserve non-target fields.
 - Config/service/onboarding state changes during the pre-save concurrency window.
-- T00 cannot quiesce other CCR management/config writers for the client-side snapshot/save interval.
+- The future T00 runtime procedure cannot quiesce relevant same-account CCR management/config writers for the client-side snapshot/save interval.
 - Enabled Provider auto-fetch cannot be proven OFF before save.
 - A Provider/model request or explicit Gateway-control RPC is required.
 - The save would require or actually causes a Gateway start.
@@ -384,8 +394,9 @@ They must cover:
 
 After External PASS, Human Gate supplies the exact PR head as candidate/instruction SHA.
 T00 Attempt 2 stopped at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910` with
-`BLOCKED_TOOLCHAIN_IDENTITY`; no helper/runtime service execution occurred. A docs-only
-sanitized diagnostic repair is followed by T00 Attempt 3 on the new exact head.
+`BLOCKED_TOOLCHAIN_IDENTITY`; no helper/runtime service execution occurred. A
+simplified Company-owned A0-only repair is followed by T00 Attempt 3 source verification and A0 on
+the new exact head. Helper runtime remains deferred until that Evidence is reviewed.
 The repair PR must not merge before T00 PASS and Human decision.
 
 ## Sanitized evidence template
@@ -406,7 +417,7 @@ Loopback/auth guard:
 Auto-fetch guard:
 Allowlisted diff:
 Forbidden path diff: 0
-Secrets/raw evidence exported: NO
+Secrets/raw evidence included in sanitized result: NO
 GitHub PR:
 Next Task started: NO
 ```
@@ -415,7 +426,7 @@ Next Task started: NO
 
 | Attempt | Actor / session role | Candidate | Instruction | External | Internal | Recommendation |
 |---:|---|---|---|---|---|---|
-| 1 | EXTERNAL_CODEX / wrapper-only implementation | final repair PR head supplied by Human Gate | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, product tree equivalence | helper runtime `NOT_STARTED`; T00 Attempt 2 A0 `BLOCKED_TOOLCHAIN_IDENTITY` before service start | `READY_FOR_INTERNAL_VALIDATION` — freeze new exact head and run T00 Attempt 3 A0 only |
+| 1 | EXTERNAL_CODEX / wrapper-only implementation | final repair PR head supplied by Human Gate | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, protected CCR source/build/package paths equal tested product; candidate/full-head build equivalence not tested or claimed | helper runtime `NOT_STARTED`; T00 Attempt 2 A0 `BLOCKED_TOOLCHAIN_IDENTITY`; later Sonnet handoff rejected before commands and did not consume Attempt 3 | `READY_FOR_INTERNAL_VALIDATION` — freeze new exact head and run T00 Attempt 3 source verification + A0 only |
 
 ## Evidence / limitations
 

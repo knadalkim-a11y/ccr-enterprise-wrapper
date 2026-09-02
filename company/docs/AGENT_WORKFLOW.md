@@ -22,6 +22,11 @@ One active attempt PR at a time
 하나의 Task는 여러 Session과 순차 Evidence PR을 가질 수 있다.
 다른 Task를 동시에 시작하지 않는다.
 
+Internal handoff의 repository/ref/SHA 확인은 Task Attempt 전 source verification이다.
+승인된 Task 실행 명령이 시작돼야 Attempt를 소비한다. Source verification 전에
+에이전트가 지시를 거부하거나 exact ref/SHA를 확인하지 못한 사건은
+`PRE_EXECUTION_HANDOFF_BLOCKED`로 기록하며 Task Attempt 결과로 승격하지 않는다.
+
 ## Four-Lane workflow
 
 ### 1. DESIGN — `CHATGPT_ORCHESTRATOR` + `HUMAN_GATE_OWNER`
@@ -34,6 +39,8 @@ One active attempt PR at a time
 - Agent Step과 Human Step을 분리한다.
 - Acceptance Criteria, Stop condition, Cleanup, Sanitized Evidence를 작성한다.
 - 승인된 Task와 상태를 GitHub canonical 문서에 반영한다.
+- 현재 Stage와 실제 위협에 필요한 최소 절차인지 `MUST NOW / CONDITIONAL / DEFER`로 검토한다.
+- 사람의 승인 왕복과 수기 Evidence 전달도 설계 비용과 실패 surface로 계산한다.
 
 금지:
 
@@ -129,7 +136,7 @@ Agent 명령
 사람의 credential/UI 입력
 Agent 결과 확인
 Service stop
-Product diff와 final status
+Product diff/fingerprint와 selected checkout status
 ```
 
 판단 기준:
@@ -205,8 +212,15 @@ Responses 호환성 조사를 현재 범위에 포함할지 결정
 내부 handoff에는 다음이 필수다.
 
 ```text
+canonical_repository_url
+candidate_fetch_ref
+task_path
 candidate_sha
 instruction_sha
+authorized_phase
+merge_policy
+required_capability_matrix
+execution_mode
 ```
 
 ### 단일 SHA 방식 — 기본
@@ -215,8 +229,9 @@ instruction_sha
 
 ```text
 Internal Validator
-→ git checkout --detach <PR_HEAD_SHA>
-→ 같은 commit의 Task 지침으로 같은 commit의 제품을 검증
+→ disposable repository에 exact ref를 explicit fetch
+→ fetched object == <PR_HEAD_SHA> 확인
+→ 같은 commit의 Task 지침으로 같은 commit의 제품을 nonce workspace에서 검증
 ```
 
 ### 두 SHA 방식 — 예외
@@ -230,6 +245,28 @@ product tree equivalence: 검증 범위 기록
 ```
 
 두 SHA를 branch 이름이나 “최신 main”이라는 표현으로 대체하지 않는다.
+
+### Human-approved validation overlay 예외
+
+활성 Task가 명시적으로 승인한 경우에만 다음 three-role contract를 사용한다.
+
+```text
+candidate_role: validation_overlay
+candidate_sha == instruction_sha == exact control/instruction PR head
+tested_product_sha: exact prior validated product commit
+protected-path equivalence: exact scope/result
+build plane: full tested_product_sha archive
+```
+
+Candidate whole-tree build equivalence는 주장하지 않는다. Handoff/Evidence는 overlay
+SHA와 tested product SHA를 별도 필드로 보존한다.
+
+PR ref가 기존 clone의 fetchspec에 없을 수 있으므로 Internal Validator는 shared
+checkout의 `origin`이나 현재 HEAD를 권한 근거로 사용하지 않는다. 활성 Task가
+승인하면 repository 밖의 disposable repository에 canonical URL의 exact ref를
+`--prune` 없이 fetch하고 fetched ref가 approved SHA와 같은지 확인한다. Source
+verification과 A0가 한 Human 승인에 묶여 있으면 이 확인이 PASS한 뒤 같은
+프롬프트에서 A0로 진행할 수 있으며 별도 승인 왕복을 만들지 않는다.
 
 ## PR merge policy
 
@@ -271,6 +308,16 @@ BLOCKED_HOST_NOT_APPROVED
 BLOCKED_MODEL_NOT_AVAILABLE
 BLOCKED_NETWORK_OR_PROXY
 BLOCKED_POLICY
+```
+
+Task Attempt 전 사건:
+
+```text
+PRE_EXECUTION_HANDOFF_BLOCKED
+→ approved Task-phase command/runtime UI/A0 not started
+→ source-verification command/local write는 실제 수행대로 기록
+→ formal Task result/category 아님
+→ current Attempt number 유지
 ```
 
 ## 환경과 capability
@@ -343,19 +390,27 @@ Credential scope가 `MISMATCH` 또는 `UNKNOWN`이면 real request를 반복하�
 
 ## Internal Validator 실행
 
-사내 시작 프롬프트는 짧게 유지한다.
-실제 맥락과 명령은 GitHub Task에 둔다.
+사내 시작 프롬프트는 자기완결형이되 승인된 한 phase만 포함한다.
+프로젝트 전체 설명은 반복하지 않지만, source를 정확히 가져오는 데 필요한
+canonical URL/ref/SHA와 허용·금지 동작은 프롬프트에 직접 둔다.
 
 ```text
 Role: INTERNAL_VALIDATOR
+Canonical repository URL: <https-url>
+Candidate fetch ref: <full-ref>
 Approved instruction SHA: <sha>
 Approved candidate SHA: <sha>
 Active Task: company/tasks/.../<task>.md
+Authorized phase: <phase only>
+Merge policy: <policy>
+Required capability matrix: <matrix>
+Execution mode: <agent_only | human_assisted>
 
-정확한 SHA를 읽고/checkout한 뒤 활성 Task 하나만 수행한다.
+disposable repository에서 exact ref/SHA를 확인한 뒤 승인된 phase만 수행한다.
 Human Step에서는 멈추고 사람의 로컬 작업을 기다린다.
 source와 GitHub를 수정하지 않는다.
-Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
+먼저 사람이 이해할 수 있는 설명을 쓰고, 수기 전달용 compact capsule을 덧붙인다.
+Sanitized Evidence를 반환하고 다음 phase/Task를 시작하지 않는다.
 ```
 
 ## AI Work Report

@@ -18,7 +18,7 @@
 ## D-003 — 외부 개발, 사내 테스트 전용
 
 - Status: ACCEPTED
-- Decision: 외부 Codex가 구현하고 사내는 정확한 commit을 pull해 문서화된 검증만 수행한다.
+- Decision: 외부 Codex가 구현하고 사내는 승인된 canonical URL/ref/SHA를 disposable repository에 가져와 문서화된 검증만 수행한다.
 - Rationale: 사내에서 발생한 임시 수정과 외부 코드의 분기를 방지한다.
 
 ## D-004 — 하나의 Git repository와 upstream history 보존
@@ -125,10 +125,10 @@
 - Decision: 모든 작업을 `DESIGN → BUILD → VALIDATE → GATE` 네 Lane으로 분리하고, Task 파일 하나에는 검증 질문과 실패 계층 하나만 둔다.
 - Design: ChatGPT Orchestrator와 Human Gate Owner가 Task, actor, execution mode, candidate/merge contract를 작성한다.
 - Build: 코드 변경이 필요할 때만 External Codex가 branch/PR을 만들며, 내부 검증 지침을 candidate에 포함한다.
-- Validate: Internal Validator는 승인된 Task와 exact instruction/candidate SHA 하나만 pull/checkout해 test-only 검증하고 종료한다.
+- Validate: Internal Validator는 승인된 Task와 canonical URL/ref, exact instruction/candidate SHA 하나만 disposable repository에 fetch/archive해 test-only 검증하고 종료한다.
 - Human-assisted: 실제 credential/UI/승인은 Human Step으로 표시하고 Internal Validator는 해당 Step에서 멈췄다가 최소 완료 상태만 받아 재개한다.
 - Gate: Human Gate Owner가 PASS/RETRY/BLOCKED/DEFER와 다음 Task를 최종 승인하고 ChatGPT Orchestrator가 canonical 상태를 반영한다.
-- Candidate: 구현 Task는 `instruction_sha == candidate_sha == PR head SHA`를 기본으로 한다. Validation-only 예외는 두 SHA와 product tree equivalence를 기록한다.
+- Candidate: 구현 Task는 `instruction_sha == candidate_sha == PR head SHA`를 기본으로 한다. Validation-only 예외는 두 SHA와 product tree equivalence를 기록한다. Human-approved `validation_overlay`는 exact control/instruction PR head와 별도 `tested_product_sha`를 사용하고 protected-path equivalence와 full tested-product build plane을 명시한다.
 - Merge: `internal_validation: required` 코드 PR은 exact PR head의 `INTERNAL_PASS` 전 병합하지 않는다.
 - Rationale: 사외 개발과 사내 비밀 환경 검증을 분리하면서도, 어떤 코드와 어떤 지침이 검증됐는지 재현 가능하게 유지한다.
 
@@ -146,3 +146,11 @@
 - Consequence: `V1-S1-T01` Provider finalization은 T00 승인 전까지 중단한다.
 - Consequence: Claude App/Desktop CCR 연결은 별도 Task 전까지 제외하며, 실제 Claude-3p 불변성은 지금부터 안전 Gate다.
 - Fallback: sandbox가 실패한 경우에만 `CCR_DISABLE_CLAUDE_APP_GATEWAY_SYNC` 같은 최소 명시적 Core patch를 증거 기반으로 검토한다.
+
+## D-018 — 설계·repair·review에 비례성과 과설계 검토를 기본 적용
+
+- Status: ACCEPTED
+- Decision: 모든 설계·repair·review에서 제안을 `MUST NOW / CONDITIONAL / DEFER`로 나누고, 현재 Stage의 관찰된 실패와 승인된 위협을 막는 최소 절차를 선택한다.
+- Human cost: 승인 왕복과 수기 Evidence 전달도 설계 비용과 실패 surface로 계산한다.
+- Guardrail: 단순화를 이유로 exact source authority, secret 경계, Enterprise invariant, fail-closed stop을 약화하지 않는다.
+- Consequence: 현재 위험을 줄이는 구체적 근거가 없는 새 gate, 상태, attestation, parser, script, 격리 계층은 추가하지 않고 필요성이 증명될 때까지 유예한다.

@@ -123,6 +123,9 @@ UNKNOWN
 
 ### Node / install preflight
 
+아래 branch/HEAD/working-tree 확인은 shared checkout을 명시적으로 사용하는
+일반 Task의 기본이다.
+
 ```powershell
 git branch --show-current
 git rev-parse HEAD
@@ -147,6 +150,21 @@ Node release line = LTS
 working tree = clean
 exact candidate commit = recorded
 ```
+
+Task-approved disposable exact-ref validation에서는 다음이 위 shared-checkout
+항목을 대체한다.
+
+```text
+canonical repository URL/ref/SHA = Human-approved exact values
+approved nonce path = new and empty before bootstrap
+prepared bare refs = exact approved main/candidate commits
+archive execution-input fingerprint = unchanged after install/build
+shared checkout branch/HEAD/status = non-authoritative and not mutated
+```
+
+활성 Task가 더 좁은 Node 계약을 명시할 수 있지만 LTS 조건을 생략하려면
+근거를 남겨야 한다. V1-S1-T00 A0는 Node `>=22` 이면서
+`process.release.lts`가 nonempty인 release만 허용한다.
 
 ### Install integrity verification
 

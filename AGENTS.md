@@ -47,6 +47,10 @@ source·Task·STATUS·Gate를 수정하거나 branch/commit/push/PR을 수행하
 - `project-state.yml`의 current Task/Stage를 자동 전진시키지 않는다.
 - Agent는 Recommendation과 Evidence를 작성할 수 있지만 최종 Gate는 Human Gate Owner가 승인한다.
 - 모델 순서는 과거 대화가 아니라 활성 Task와 serving availability를 따른다.
+- 설계·repair·review마다 현재 Stage와 실제 위협에 필요한 최소 통제인지 확인한다.
+- 새 gate, 상태, script, attestation 또는 격리 계층은 현재 위험을 줄이는 구체적 근거가 있을 때만 추가한다.
+- 동일한 안전성을 더 단순한 절차로 달성할 수 있으면 `MUST NOW / CONDITIONAL / DEFER`로 나누고 더 작은 절차를 선택한다.
+- 사람의 수기 Evidence 전달과 승인 왕복도 비용·실패 surface로 계산한다.
 
 ## Required task metadata
 
@@ -88,11 +92,18 @@ Internal Validator는 roadmap에서 Task를 선택하지 않고 승인된 Task/S
 
 ## Candidate / instruction contract
 
-사내 검증 handoff에는 다음 두 값이 필수다.
+사내 검증 handoff에는 다음이 모두 필수다.
 
 ```text
+canonical_repository_url
+candidate_fetch_ref
+task_path
 candidate_sha
 instruction_sha
+authorized_phase
+merge_policy
+required_capability_matrix
+execution_mode
 ```
 
 기본은:
@@ -110,6 +121,23 @@ Instruction commit
 Tested product commit
 Product tree equivalence 범위와 결과
 ```
+
+### Human-approved validation overlay exception
+
+활성 Task가 명시적으로 승인할 때만 control/instruction PR head와 이미 검증된
+product build plane을 분리할 수 있다.
+
+```text
+candidate_role: validation_overlay
+overlay candidate_sha == instruction_sha == exact PR head
+tested_product_sha: exact prior validated product commit
+protected-path equivalence: exact scope/result
+build plane: full tested_product_sha archive
+```
+
+이 경우 candidate는 제품 commit을 뜻하지 않는다. Handoff와 Evidence에 overlay,
+tested product와 equivalence를 모두 분리해 기록하며 candidate whole-tree build
+equivalence를 주장하지 않는다.
 
 Internal Validator는 branch 이름, `latest`, 현재 checkout을 근거로 SHA를 추측하지 않는다.
 
@@ -136,15 +164,18 @@ Internal Validator는 branch 이름, `latest`, 현재 checkout을 근거로 SHA�
 허용:
 
 ```text
-git fetch --prune origin
-git pull --ff-only
-git checkout --detach <approved candidate SHA>
-git show <approved instruction SHA>:<task path>
-git rev-parse HEAD
-git status --short
-git diff --exit-code
+Task-approved disposable repository를 repository 밖에 생성
+canonical URL의 approved ref를 prune 없이 명시적으로 fetch
+git show <approved instruction SHA>:<task path or Task-listed Required knowledge path>
+git archive <Task-approved commit SHA> to an approved nonce workspace
+git rev-parse / cat-file / hash-object without -w / merge-base / diff --exit-code
+git diff --name-only -z --no-renames for Task-approved candidate scope
 Task의 명령과 UI 검증
 ```
+
+기존 shared checkout의 `origin`, fetchspec, branch, HEAD 또는 local Git config를
+candidate 권한 근거로 사용하지 않는다. Task가 명시적으로 승인하지 않은
+`pull`, `--prune`, shared checkout 변경은 하지 않는다.
 
 금지:
 
@@ -157,6 +188,7 @@ Issue / PR 작성 또는 수정
 Task / STATUS / Gate / project-state 수정
 제품 source/dependency/script/lockfile 수정
 repository 안의 report/임시 파일 생성
+기존 shared checkout의 fetch/prune/pull/checkout
 ```
 
 결과를 사람에게 sanitized text로 반환하고 종료한다.
@@ -283,7 +315,22 @@ Core 변경은 Task가 허용한 경우만 가능하며 `company/patches/CORE_PA
 ### `INTERNAL_VALIDATOR`
 
 GitHub를 수정하지 않고 `ROLES_AND_HANDOFF.md`의 Sanitized Evidence만 출력한다.
-반드시 candidate/instruction SHA, Human Step, product diff, final status, `Git write performed: NO`를 포함한다.
+반드시 candidate/instruction SHA, Human Step, product diff/fingerprint, 선택된 checkout
+status와 다음 mutation scope를 사실대로 포함한다. Disposable archive flow에는
+working tree가 없으므로 shared checkout status를 `NOT_APPLICABLE`로 기록한다.
+
+```text
+agent-requested GitHub/remote write
+agent-authored source/history
+agent-targeted existing shared checkout mutation
+disposable local Git/workspace write
+agent-requested runtime/config/service action
+unobserved child side effects
+```
+
+`Git write performed: NO`처럼 local fetch/archive/install write를 숨길 수 있는 합성 표현은 사용하지 않는다.
+Lifecycle/subprocess가 허용된 Task에서는 위 항목을 host-wide 무변경 주장으로
+확대하지 않고, 관찰하지 않은 child side effect는 `NOT_OBSERVED / NOT_CLAIMED`로 남긴다.
 
 ### `CHATGPT_ORCHESTRATOR`
 

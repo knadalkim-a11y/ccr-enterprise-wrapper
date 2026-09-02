@@ -20,14 +20,16 @@
 - Stage: `V1-S1`
 - Active Task: `V1-S1-T00`
 - Active Task path: `company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md`
-- Status: `READY_FOR_INTERNAL_VALIDATION`
+- Status: `READY_FOR_INTERNAL_VALIDATION — A0_ONLY`
 - T02: `EXTERNAL_PASS` — wrapper-only helper syntax PASS, synthetic/mock tests 159/159
-- Repair scope: `company/** only`; CCR `packages/**` prohibited
-- T00 Attempt 1: `BLOCKED — GLOBAL_PROFILE_PERSISTENCE`
+- Repair scope: T00 frontmatter의 exact `allowed_paths` only; protected CCR source/build/package paths unchanged and prohibited; candidate whole-tree build equivalence `NOT_CLAIMED`; A0 build plane은 full `97b73a9...`
+- T00 Attempt 1: `BLOCKED_POLICY — CONFIG_SAVE_PATH_UNAVAILABLE`; management start isolation PASS, config-save `NOT_TESTED`
 - T00 Attempt 2: `BLOCKED — BLOCKED_TOOLCHAIN_IDENTITY` at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910`; exact checkpoint not captured; console closed
-- T00 Attempt 3: `NOT_STARTED`; new exact frozen-head A0 only authorized
+- Pre-execution handoff incident: Internal Sonnet rejected inconsistent authority before commands; formal Task result 없음; Attempt 3 remains `NOT_STARTED`
+- T00 Attempt 3: `NOT_STARTED`; new exact frozen-head source verification + A0 only pending Human handoff
+- External repair verification: A0 source-contract tests `11 PASS / 1 SKIP`; Windows PowerShell 5.1 parser/runtime `NOT_RUN_EXTERNAL`; unchanged T02 tests `159/159 PASS`
 - Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
-- Goal: sanitized phase/tool/reason diagnostics가 포함된 새 exact frozen PR head에서 A0 preflight부터 다시 시작
+- Goal: shared checkout을 변경하지 않는 exact overlay verification 뒤 full validated product `97b73a9...` archive에서 reviewed one-shot PS5.1 A0 install/typecheck/build만 수행하고 HOLD
 - Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
 
@@ -210,7 +212,7 @@ normal Claude Desktop
 ```text
 %APPDATA%\claude-code-router\**
 %APPDATA%\CompanyCCR\runtime-localappdata\**
-%APPDATA%\CompanyCCR\validation-workspaces\**
+%LOCALAPPDATA%\CompanyCCR\validation-workspaces\**
 CCR-scoped profile/settings
 local recovery backup outside repository
 ```
@@ -218,27 +220,22 @@ local recovery backup outside repository
 ## Current open risks
 
 - Management start isolation passed one Windows Attempt, but the wrapper-assisted config-save isolation has not run internally.
-- Attempt 2의 A0 toolchain identity capsule은 exact phase/tool/reason을 보존하지 않아 원인을 확정할 수 없다. Post-block diagnostic은 실행되지 않았고 session console은 닫혔다. `npm.ps1` precedence는 Application-only binding으로 배제되지만 정확한 원인은 여전히 unknown이며 stale state를 재사용하지 않는다.
-- Attempt 3 instruction은 toolchain identity failure를 raw path/hash/error 없이 fixed `PHASE/TOOL/REASON` allowlist로 반환하도록 보완됐지만 아직 Windows에서 실행되지 않았다.
+- Attempt 2의 exact toolchain checkpoint는 old capsule로 확인할 수 없으며 stale console을 재사용하지 않는다.
+- 이전 Attempt 3 handoff는 명령 실행 전에 거부됐다. 현재 PR head가 아니라 새 repaired head/ref/SHA handoff가 필요하다.
+- A0의 `npm ci` 자식은 pinned dependency lifecycle code 실행과 npm network access가 허용된 상태로 현재 Windows user 권한에서 실행된다. 실제 lifecycle child/connection 발생은 별도로 관찰했다고 주장하지 않는다. 별도 account/VM은 정책, account 동시 사용 또는 credential exposure 위험이 있을 때만 요구한다.
+- Tailwind v4 build는 repository-root text를 자동 탐색하므로 candidate의 governance/docs 변경도 full-head CSS build input이 될 수 있다. A0는 이 숨은 입력을 `97b73a9...` full archive build plane으로 분리하며 current main/PR full-head build equivalence 또는 merge safety를 주장하지 않는다. Eventual merge/release 전 exact-head를 새 product로 검증할지 Tailwind input boundary를 별도 product Task에서 고정할지 결정해야 한다.
+- A0 script의 source contract는 외부에서 검토됐지만 Windows PowerShell 5.1 parser와 실제 Windows 실행은 아직 사내 exact-head source verification/A0에서 확인해야 한다.
+- A0-only head에는 executable H0/A1+ procedure가 없다. A0 Evidence 뒤 최소 runtime procedure를 별도로 설계하고 새 exact head/Attempt로 검증해야 한다.
 - Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
 - Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
 - Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
 - The wrapper-only helper passed 159/159 external synthetic/mock tests but has not touched internal runtime data.
-- Stock Management RPC exposes neither daemon `LOCALAPPDATA` nor a revision/CAS save; fresh A2 ownership, all-writer H0 quiescence and unconditional A3 remain mandatory.
-- Canonical SQLite metadata checks do not prove DB row/schema fixed point or a write-free first open; legacy migration sources must be absent before the first Node/npm process and again before A2.
-- Real APPDATA의 stale Claude App backup, concurrent config change and indeterminate save outcome require dedicated fail-closed categories.
-- `start --no-gateway` can reuse an existing service; T00 A0/A2 plus service-identity and pre-save Gateway-state checks are mandatory.
-- A shared-PC writer could race the non-atomic state check and stock stop; H0 must close every CCR management/Desktop/UI/config writer while the dedicated validation PowerShell remains open.
-- The same dedicated 64-bit PowerShell process must survive A0 through A2–A3; losing it before A2 restarts from A0, while losing it during A2–A3 requires Human recovery.
-- The nonce validation workspace remains local for Gate review and needs later Human cleanup of that exact nonce only.
-- Enabled Provider `autoFetchModels` can schedule immediate outbound model refresh after save; the helper fails closed unless it is OFF.
+- Future runtime must still prove fresh service ownership, stopped Gateway, relevant current-user writer quiescence, Enterprise invariance and unconditional cleanup.
+- 다른 Windows 사용자 세션 전체 종료는 필요 없지만 같은 Windows account 동시 사용 또는 relevant process/port owner 불명확은 runtime blocker다.
+- The single nonce validation workspace remains local for Gate review; its sanitized 32-hex ID must be returned so Human cleanup later targets that exact nonce only.
 - The Management RPC is pinned-version source surface rather than a permanent public API and must be revalidated on upstream update.
-- Runtime sandbox may affect app discovery or child environment inheritance; CLI-only scope limits this but must be tested.
-- A Core sync-disable patch is not justified by Attempt 1 because sandbox start and Claude-3p materialization passed.
 - Provider persistence, local gateway completion, Streaming, Tools and error classification remain unverified.
-- Request logs/body capture must be OFF before real prompt.
 - GLM rollout is pending.
-- Multi-user PC-level runtime ownership and telemetry source remain V1-S3 questions.
 - GitHub Actions remain disabled.
 
 ## Last passed Gate
@@ -263,15 +260,14 @@ local recovery backup outside repository
 
 ## Exact next action
 
-T02 External PASS, Attempt 2 A0 block와 Human docs-only diagnostic repair approval이
-기록됐다. 현재 승인 범위는 다음뿐이다.
-
 ```text
-1. A0 sanitized toolchain diagnostic repair를 포함한 final repair PR head 하나를 동결
-2. Human Gate가 그 exact 40-char SHA를 candidate SHA이자 instruction SHA로 승인
-3. Internal Validator가 새 전용 interactive 64-bit PowerShell console에서 T00 Attempt 3 A0만 수행
-4. compact sanitized A0 capsule만 반환하고 같은 console을 열어 둔 채 중단
-5. CHATGPT_ORCHESTRATOR와 Human Gate가 A0 Evidence를 검토
+1. External source-contract review를 통과한 simplified A0-only repair를 새 exact PR head로 동결한다.
+2. Human Gate가 canonical URL, refs/pull/23/head, main/candidate/instruction/product SHA, `A0_ONLY`, `agent_only`, capability, same-account/VM precondition과 npm network/lifecycle risk 수용을 한 번 승인한다.
+3. Internal Validator가 하나의 self-contained prompt에서 disposable source verification 후 reviewed A0 script만 실행한다.
+4. readable explanation + compact A0 capsule을 반환하고 종료한다.
+5. CHATGPT_ORCHESTRATOR와 Human Gate가 Evidence를 검토한다.
 ```
 
-A0 검토 전 H0 또는 A1+로 진행하지 않는다. T00 Human decision `ACCEPTED` 전에는 T01을 시작하거나 repair PR을 merge하지 않는다.
+A0 검토 전 H0 또는 A1+ procedure를 만들거나 실행하지 않는다. A0 PASS도 T00 PASS,
+T02 internal PASS 또는 repair PR merge 승인이 아니다. T00 Human decision `ACCEPTED`
+전에는 T01을 시작하지 않는다.
