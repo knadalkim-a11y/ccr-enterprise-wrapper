@@ -37,6 +37,10 @@ Role: CHATGPT_ORCHESTRATOR
 | CCR 원본 기능 | 활성 Task가 지정한 upstream source/docs |
 
 Issue와 PR은 전달·리뷰 수단이며 canonical 문서보다 우선하지 않는다.
+단, Human Gate가 exact SHA로 승인한 PR bundle은 canonical main의 권한을
+확장하지 않는 범위에서 해당 Task/phase의 execution overlay가 될 수 있다.
+이때 main SHA, canonical repository URL, PR fetch ref, instruction/candidate SHA와
+authorized phase를 handoff에 함께 고정한다.
 
 ## 새 세션 읽기 순서
 
@@ -201,6 +205,32 @@ Enterprise smoke
 - Sanitized Evidence 템플릿과 Stop condition을 포함한다.
 - Claude Task에는 invariant/allowed paths와 fail-closed 조건을 포함한다.
 
+## 비례성·과설계 검토
+
+설계·repair·review마다 기능 정확성·보안과 함께 다음을 기본 확인한다.
+
+```text
+MUST NOW
+→ 현재 Task의 실제 실패 또는 승인된 위협을 직접 줄임
+
+CONDITIONAL
+→ 특정 정책, 다중 사용자, credential 또는 배포 조건에서만 필요
+
+DEFER
+→ 미래 fleet/자동화/적대적 contributor를 가정해야만 필요
+```
+
+다음 질문에 답하지 못하는 새 gate, 상태, attestation, script, parser 또는
+격리 계층은 추가하지 않는다.
+
+1. 지금 관찰된 어떤 실패를 막는가?
+2. 더 작은 절차로 같은 안전성을 얻을 수 없는가?
+3. 사람의 승인 왕복·수기 Evidence·실행 실패 surface를 얼마나 늘리는가?
+4. 현재 V1 증거 수집에 필요한가, 아니면 미래 운영 자동화인가?
+
+보안 통제를 제거할 때는 남는 위험을 숨기지 않고 명시적으로 수용하거나
+조건부 통제로 남긴다. 단순함 자체를 위해 invariant나 secret 경계를 약화하지 않는다.
+
 ## Candidate 설계
 
 ### 구현 Task — 단일 SHA 기본
@@ -223,6 +253,22 @@ product tree equivalence: 기록
 ```
 
 새로운 코드 변경 Task에서는 가능한 한 두 SHA 방식을 만들지 않는다.
+
+### Human-approved validation overlay — 좁은 예외
+
+활성 Task가 명시적으로 승인한 경우에만 control/instruction PR head와 과거 tested
+product를 다음처럼 분리한다.
+
+```text
+candidate_role: validation_overlay
+candidate_sha == instruction_sha == exact control/instruction PR head
+tested_product_sha: exact prior validated product commit
+protected-path equivalence: exact scope/result
+build plane: full tested_product_sha archive
+```
+
+Overlay SHA와 tested product SHA를 handoff와 Evidence에서 별도로 보존한다. 이
+예외로 candidate whole-tree build equivalence나 merge safety를 주장하지 않는다.
 
 ## Human-assisted Task 설계
 
@@ -248,13 +294,23 @@ Human Step에는 사람이 할 일, agent output 금지 값, 최소 반환 상�
 
 ```text
 Role: INTERNAL_VALIDATOR
+Canonical repository URL: <https-url>
+Repository main SHA: <sha>
+Main fetch ref: <full-ref, Task가 요구할 때>
+Candidate fetch ref: <full-ref>
 Approved Task: <path>
 Approved instruction SHA: <sha>
 Approved candidate SHA: <sha>
+Candidate role: <implementation|validation|validation_overlay>
+Tested product SHA: <sha, validation_overlay only>
+Protected-path equivalence: <scope/result, validation_overlay only>
+Authorized phase: <phase>
+Merge policy: <policy>
+Required capability matrix: <name=value...>
 Execution mode: <mode>
 
 정확한 Task와 SHA만 사용한다.
-Human Step에서 멈춘다.
+승인된 phase가 끝나면 멈추고, Human Step이 있으면 그 직전에 멈춘다.
 source와 GitHub를 수정하지 않는다.
 Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 ```
@@ -267,7 +323,8 @@ Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 2. Task Acceptance Criteria와 모순되는지 검토한다.
 3. PASS/FAIL/BLOCKED를 environment, isolation, credential, protocol, quality로 분리한다.
 4. Human Step이 실제로 완료됐는지 확인한다.
-5. Enterprise invariant, product diff, final Git status를 확인한다.
+5. Enterprise invariant, product diff/fingerprint와 선택된 checkout status를 확인한다.
+   Disposable archive flow의 shared checkout status는 `NOT_APPLICABLE`이다.
 6. 수동 복구가 있었다면 PASS로 승격하지 않는다.
 7. 불완전한 evidence를 전체 Gate PASS로 확대하지 않는다.
 8. 승인 범위에서 Task/STATUS/Gate/Issue를 갱신한다.
@@ -307,6 +364,9 @@ Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 14. Internal Validator에게 GitHub write/source 수정이 요구되지 않았는가
 15. 다음 Task는 Human Gate 없이 전진하지 않았는가
 16. 새 세션이 읽을 정확한 다음 행동이 남아 있는가
+17. 새 통제가 `MUST NOW / CONDITIONAL / DEFER`로 검토됐는가
+18. 같은 안전성을 유지하면서 더 작은 절차로 줄일 수 없는가
+19. 사람의 승인 왕복과 수기 Evidence 부담이 필요 이상으로 늘지 않았는가
 
 변경이 없으면 억지로 문서를 수정하지 않는다.
 

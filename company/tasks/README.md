@@ -39,8 +39,8 @@ Preflight
 사람의 credential/UI 입력
 Agent의 결과 확인
 Service stop
-Product diff
-Final Git status
+Product diff / fingerprint
+Selected checkout status (`NOT_APPLICABLE` for disposable archive)
 ```
 
 판단 기준:
@@ -86,7 +86,7 @@ Human-assisted Task는 Task 본문에 `[INTERNAL_VALIDATOR]`와 `[HUMAN_GATE_OWN
 
 3. VALIDATE
    INTERNAL_VALIDATOR + 필요한 Human Step
-   → exact candidate pull/checkout, test-only, sanitized evidence
+   → disposable repository에 canonical exact ref/SHA fetch/archive, test-only, sanitized evidence
 
 4. GATE
    HUMAN_GATE_OWNER + CHATGPT_ORCHESTRATOR
@@ -94,16 +94,27 @@ Human-assisted Task는 Task 본문에 `[INTERNAL_VALIDATOR]`와 `[HUMAN_GATE_OWN
 ```
 
 Internal Validator는 전체 roadmap을 읽고 다음 Task를 스스로 선택하지 않는다.
-`project-state.yml`과 Human Gate Owner가 승인한 Task/SHA 하나만 실행하고 종료한다.
+`project-state.yml`과 Human Gate Owner가 승인한 Task/phase/ref/SHA 하나만 실행하고 종료한다.
 
 ## Candidate / instruction contract
 
-내부 검증 handoff에는 다음 두 값이 필수다.
+내부 검증 handoff에는 다음 값이 필수다.
 
 ```text
+canonical_repository_url
+candidate_fetch_ref
+task_path
 candidate_sha
 instruction_sha
+authorized_phase
+merge_policy
+required_capability_matrix
+execution_mode
 ```
+
+Internal Validator는 shared checkout의 `origin`, fetchspec, branch/HEAD를 권한
+근거로 사용하지 않고 Task-approved disposable repository에 exact ref를
+`--prune` 없이 fetch한다.
 
 ### 구현 Task
 
@@ -130,6 +141,20 @@ Product tree equivalence 범위
 를 모두 Evidence에 기록한다.
 두 SHA가 다르다는 사실을 숨기거나 branch 이름만으로 대체하지 않는다.
 
+### Human-approved validation overlay Task
+
+활성 Task가 `candidate_role: validation_overlay`를 명시할 때만 다음을 사용한다.
+
+```text
+candidate_sha == instruction_sha == exact control/instruction PR head
+tested_product_sha: exact prior validated product commit
+protected-path equivalence: exact scope/result
+build plane: full tested_product_sha archive
+```
+
+이 예외의 candidate는 product commit이 아니며 candidate whole-tree build
+equivalence를 주장하지 않는다.
+
 ## GitHub write ownership
 
 ```text
@@ -140,7 +165,7 @@ EXTERNAL_CODEX
 → 활성 구현 Task의 branch/commit/push/PR 가능
 
 INTERNAL_VALIDATOR
-→ pull/read/test only, GitHub write 금지
+→ disposable exact-ref fetch/archive/read/test only, GitHub/source/shared-checkout write 금지
 
 HUMAN_GATE_OWNER
 → 최종 Gate와 다음 Task 승인

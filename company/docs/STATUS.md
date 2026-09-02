@@ -20,9 +20,21 @@
 - Stage: `V1-S1`
 - Active Task: `V1-S1-T00`
 - Active Task path: `company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md`
-- Status: `READY_INTERNAL`
-- Goal: Stock CCR management/runtime를 process-local `LOCALAPPDATA` sandbox에서 실행해도 Enterprise Claude settings, actual Claude-3p, User/Machine env와 일반 `claude`가 변경되지 않는지 증명
-- Candidate product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
+- Machine status: `ready_internal`; executable phase: `ATTEMPT_4_PREPARE_AND_H0_RUNTIME_AFTER_EXACT_HEAD_HUMAN_APPROVAL`
+- Design status: `ATTEMPT_3_A0_RECORDED / H0_DESIGN_APPROVED / CONTROLLER_EXTERNAL_PASS`
+- Runtime controller: `IMPLEMENTED / EXTERNAL_REVIEW_PASS`; this is not internal runtime PASS or exact-head Human approval
+- T02: `EXTERNAL_PASS` — wrapper-only helper syntax PASS, synthetic/mock tests 159/159
+- Repair scope: T00 frontmatter의 exact `allowed_paths` only; protected CCR source/build/package paths unchanged and prohibited; candidate whole-tree build equivalence `NOT_CLAIMED`; A0 build plane은 full `97b73a9...`
+- T00 Attempt 1: `BLOCKED_POLICY — CONFIG_SAVE_PATH_UNAVAILABLE`; management start isolation PASS, config-save `NOT_TESTED`
+- T00 Attempt 2: `BLOCKED — BLOCKED_TOOLCHAIN_IDENTITY` at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910`; exact checkpoint not captured; console closed
+- Pre-execution handoff incident: Internal Sonnet rejected inconsistent authority before commands; formal Task result 없음; 당시 Attempt 3는 시작되지 않음
+- T00 Attempt 3 at approved/repository-correlated `e16b4a90c7f5f7171905ad7c2993e8dcf6781353`: `A0_PASS_ONLY / INCOMPLETE / H0_NOT_STARTED`; Human confirmation `E16_OK`, normalized transcribed fields, Node `v24.15.0`, npm `11.12.1`, exit `0`, workspace `4b5fc32468f4a9c103af7686987e9b26`
+- A0 Evidence provenance: `HUMAN_TRANSCRIBED_SANITIZED_INTERNAL_VALIDATOR_OUTPUT`; capsule normalized by Orchestrator, not claimed verbatim; external independent rerun `NO`; PR #23 exact `e16...` correlation independently verified
+- External repair verification: combined tests `182 PASS / 0 FAIL / 2 expected Windows-only SKIP`; unchanged T02 synthetic/mock tests `159/159 PASS`; controller contract tests `12/12 PASS` plus Windows PS5.1 parser `PENDING_INTERNAL`; exact `e16...` Windows PS5.1 A0 internally reported PASS
+- Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
+- H0 design: Human-assisted before-smoke/quiescence 뒤 active Sonnet을 종료하고, reviewed one-shot PowerShell controller가 backup/baseline/runtime/T02/cleanup을 이어서 수행
+- Attempt 4: `NOT_STARTED`; frozen exact-head Human approval and source verification pending
+- Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
 
 ## Accepted execution model
@@ -180,7 +192,7 @@ Enterprise before/during/after PASS
 | Router stop as rollback | REJECTED | observed persistent client config |
 | Dual command model | ACCEPTED_AS_V1_DEFAULT | `claude` vs `company-claude` |
 | Only-opened-from-CCR + CLI-only | ACCEPTED_AS_V1_DEFAULT | System default prohibited |
-| Runtime LOCALAPPDATA sandbox | READY_FOR_SPIKE | V1-S1-T00 |
+| Runtime LOCALAPPDATA sandbox | READY_INTERNAL_CONTROLLER_EXTERNAL_PASS_ATTEMPT4_NOT_STARTED | V1-S1-T00 Attempts 1–3 + T02 External PASS |
 | GLM onboarding | DEFERRED | serving rollout |
 | Gateway completion/stream/tool | UNVERIFIED | later V1-S1 Tasks |
 | Claude Code isolated E2E | UNVERIFIED | V1-S2 |
@@ -204,21 +216,33 @@ normal Claude Desktop
 ```text
 %APPDATA%\claude-code-router\**
 %APPDATA%\CompanyCCR\runtime-localappdata\**
+%LOCALAPPDATA%\CompanyCCR\validation-workspaces\**
 CCR-scoped profile/settings
 local recovery backup outside repository
 ```
 
 ## Current open risks
 
-- Runtime sandbox feasibility is not yet proven on internal Windows.
-- Existing CCR runtime config may contain stale global/System-default profile state.
-- `start --no-gateway` alone is insufficient: UI config save can still call Claude App sync.
-- Runtime sandbox may affect app discovery or child environment inheritance; CLI-only scope limits this but must be tested.
-- If sandbox fails, a minimal explicit Claude App sync-disable Core patch may be needed.
+- Management start isolation passed one Windows Attempt, but the wrapper-assisted config-save isolation has not run internally.
+- Attempt 2의 exact toolchain checkpoint는 old capsule로 확인할 수 없으며 stale console을 재사용하지 않는다.
+- Attempt 3 A0 PASS는 exact `e16...`에만 귀속된다. Evidence/H0 design commit이나 future runtime head에 자동 승계되지 않는다.
+- A0의 `npm ci` 자식은 pinned dependency lifecycle code 실행과 npm network access가 허용된 상태로 현재 Windows user 권한에서 실행된다. 실제 lifecycle child/connection 발생은 별도로 관찰했다고 주장하지 않는다. 별도 account/VM은 정책, account 동시 사용 또는 credential exposure 위험이 있을 때만 요구한다.
+- Attempt 4의 fresh `-Prepare`도 full `97b...` archive에서 npm ci/typecheck/build를 H0 전에 다시 수행하므로 새 exact-head handoff에서 같은 npm network/lifecycle/current-user risk를 별도로 승인해야 한다.
+- Tailwind v4 build는 repository-root text를 자동 탐색하므로 candidate의 governance/docs 변경도 full-head CSS build input이 될 수 있다. A0는 이 숨은 입력을 `97b73a9...` full archive build plane으로 분리하며 current main/PR full-head build equivalence 또는 merge safety를 주장하지 않는다. Eventual merge/release 전 exact-head를 새 product로 검증할지 Tailwind input boundary를 별도 product Task에서 고정할지 결정해야 한다.
+- Exact `e16...`의 Windows PowerShell 5.1 parser/runtime A0는 Human-transcribed sanitized Evidence상 PASS다. 이는 external independent rerun이나 successor-head PASS가 아니다.
+- Runtime controller는 external review를 통과했지만 Windows PS5.1 parser/runtime, H0와 T02 helper는 아직 내부 실행되지 않았다. H0를 단독 실행하면 quiescence가 stale해지므로 frozen exact head 승인 뒤 `-Prepare` handoff와 함께 수행해야 한다.
+- Stock `getAppInfo`의 Windows app discovery는 daemon descendant로 System PowerShell `-ExecutionPolicy Bypass`와 `where.exe`를 호출하며 controller가 그 descendant의 시간/출력을 직접 제한할 수 없다. Controller는 canonical `SystemRoot`/`windir`와 두 executable identity를 bind하고 RPC wall-clock timeout 뒤 불확실하면 manual recovery로 차단한다. CCR `packages/**`를 수정하지 않는 결정에 따른 open residual risk이며 exact-head Human handoff에서 별도 확인한다.
+- Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
+- Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
+- Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
+- Stock default `requestLogBodyCapture="all"`과 T02 helper의 required fixed point `"none"`가 실제 config에서 충돌할 수 있다. Internal state는 미확인이며 future no-save preflight가 `BLOCKED_RUNTIME_SURFACE`로 판단하게 둔다.
+- The wrapper-only helper passed 159/159 external synthetic/mock tests but has not touched internal runtime data.
+- Future runtime must still prove fresh service ownership, stopped Gateway, relevant current-user writer quiescence, Enterprise invariance and unconditional cleanup. Active Sonnet도 writer이므로 source materialization 뒤 종료하고 plain PowerShell controller를 사용해야 한다.
+- 다른 Windows 사용자 세션 전체 종료는 필요 없지만 같은 Windows account 동시 사용 또는 relevant process/port owner 불명확은 runtime blocker다.
+- Attempt 3 nonce `4b5fc32468f4a9c103af7686987e9b26`은 Evidence review용으로 유지한다. 새 ref를 fetch하거나 runtime root로 자동 재사용하지 않고, cleanup은 나중 exact nonce만 대상으로 한다.
+- The Management RPC is pinned-version source surface rather than a permanent public API and must be revalidated on upstream update.
 - Provider persistence, local gateway completion, Streaming, Tools and error classification remain unverified.
-- Request logs/body capture must be OFF before real prompt.
 - GLM rollout is pending.
-- Multi-user PC-level runtime ownership and telemetry source remain V1-S3 questions.
 - GitHub Actions remain disabled.
 
 ## Last passed Gate
@@ -243,28 +267,13 @@ local recovery backup outside repository
 
 ## Exact next action
 
-Internal Validator가 `V1-S1-T00` 하나만 수행한다.
-
 ```text
-1. Enterprise before baseline과 local recovery backup 확인
-2. exact candidate를 clean detached checkout
-3. CCR service를 process-local sandbox LOCALAPPDATA로 start --no-gateway
-4. CCR UI에서 enabled global Claude Code profile을 0으로 만들고 logging OFF 저장
-5. actual Enterprise settings / Claude-3p / User+Machine env / normal claude가 unchanged인지 확인
-6. CCR stop
-7. Enterprise after smoke
-8. product diff와 final Git status
-9. sanitized Evidence 반환
+1. External review/test와 seven-file scope 검증을 끝낸 동일 head를 PR #23의 exact runtime head로 동결한다. 승인 정보를 넣기 위한 docs-after-freeze commit은 만들지 않는다.
+2. Human Gate가 frozen exact SHA, Attempt 4, human_assisted mode, 두 capability, npm network/lifecycle/current-user risk와 Stock `getAppInfo` residual risk를 별도로 승인하면 conditional phase가 실행 가능해진다.
+3. Internal Sonnet은 새 nonce source verification과 controller `-Prepare` build, 한 줄 `-Run` handoff 뒤 종료한다. 그 다음에만 Human H0와 plain PowerShell runtime을 끊김 없이 수행한다.
+4. Human Gate가 compact runtime Evidence를 검토한 뒤 recovery가 불필요하다고 승인하면 exact post-Gate backup cleanup을 실행한다. Cleanup PASS 전에는 T00 `ACCEPTED`/merge로 진행하지 않는다.
 ```
 
-T00 PASS 전에는:
-
-```text
-V1-S1-T01 재개 금지
-Stock CCR를 actual LOCALAPPDATA에서 재시작 금지
-Connect agent / Let's start 금지
-company-claude profile 생성 금지
-real model request 금지
-```
-
-T00 결과를 Human Gate Owner가 전달한 뒤에만 V1-S1-T01을 재활성화한다.
+이번 head는 controller external PASS까지 기록하지만 H0 실행, A1+, T02 internal PASS,
+merge 또는 T01을 승인하지 않는다. T00 Human decision `ACCEPTED` 전에는 T01을
+시작하지 않는다.

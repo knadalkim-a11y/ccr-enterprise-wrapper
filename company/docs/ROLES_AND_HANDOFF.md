@@ -84,14 +84,20 @@ Android / Termux
 ### 허용되는 Git 동작
 
 ```powershell
-git fetch --prune origin
-git pull --ff-only origin <approved-ref>
-git checkout --detach <APPROVED_CANDIDATE_SHA>
-git show <APPROVED_INSTRUCTION_SHA>:<TASK_PATH>
-git rev-parse HEAD
-git status --short
+git init --bare <TASK_APPROVED_DISPOSABLE_PATH>
+git fetch --no-tags <CANONICAL_URL> +<APPROVED_REF>:<APPROVED_LOCAL_REF>
+git show <APPROVED_INSTRUCTION_SHA>:<TASK_PATH_OR_TASK_LISTED_REQUIRED_KNOWLEDGE_PATH>
+git archive --format=zip --output=<APPROVED_LOCAL_PATH> <TASK_APPROVED_COMMIT_SHA>
+git rev-parse / cat-file / hash-object without -w / merge-base
 git diff --exit-code -- <approved-paths>
+git diff --name-only -z --no-renames <approved-base> <approved-candidate> --
 ```
+
+이 동작은 활성 Task가 명시적으로 허용하고 repository 밖의 Task-approved local
+nonce workspace일 때만 가능하다. Exact head를 test-only로 materialize하며
+source/Git history/GitHub write는 하지 않지만 disposable local object/ref/file은
+생성한다. 기존 shared checkout의 `origin`, fetchspec, branch 또는 HEAD를 권한
+근거로 사용하지 않으며 `pull`, `--prune`, shared checkout 변경은 기본 금지다.
 
 ### 금지되는 동작
 
@@ -115,7 +121,9 @@ repository 안에 AI_WORK_REPORT.md 또는 임시 파일 생성
 - 실패 시 코드를 고치지 않고 failure category를 반환한다.
 - Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
 
-Working tree가 dirty하면 임의로 정리하지 않고 경로만 보고한 뒤 중단한다.
+Task-approved disposable path가 이미 존재하거나 비어 있지 않으면 임의로
+정리하지 않고 중단한다. 기존 shared checkout의 working tree 상태는
+candidate 권한 또는 검증 입력으로 사용하지 않는다.
 
 ## `HUMAN_GATE_OWNER`
 
@@ -154,14 +162,23 @@ Working tree가 dirty하면 임의로 정리하지 않고 경로만 보고한 �
 Internal Validator가 GitHub 문서를 직접 갱신하지 않는다.
 External Codex가 사내 raw evidence를 직접 받지 않는다.
 
+Source verification 단계의 에이전트 지시 거부, ref 부재 또는 SHA 불일치는
+`PRE_EXECUTION_HANDOFF_BLOCKED` 사건이다. Approved Task-phase command/runtime UI·A0가
+시작되지 않았다면 Attempt를 소비하거나 formal Task result/category로
+기록하지 않는다. 다만 이미 실행한 source-verification command와 disposable
+local write는 Evidence에 사실대로 남긴다.
+
 ## Candidate / instruction handoff
 
 모든 사내 검증 handoff에는 다음이 포함돼야 한다.
 
 ```text
+Canonical repository URL
+Candidate fetch ref
 Task path
 instruction_sha
 candidate_sha
+Authorized phase
 merge policy
 required capability matrix
 execution mode
@@ -186,6 +203,22 @@ product tree equivalence: 비교 범위와 결과
 ```
 
 두 SHA가 다르면 Evidence에도 둘 다 남긴다.
+
+### Human-approved validation overlay 예외
+
+활성 Task가 명시적으로 승인할 때만 다음을 허용한다.
+
+```text
+candidate_role: validation_overlay
+candidate_sha == instruction_sha == exact control/instruction PR head
+tested_product_sha: exact prior validated product commit
+protected-path equivalence: exact scope/result
+build plane: full tested_product_sha archive
+```
+
+Candidate는 이 예외에서 제품 commit이 아니다. Overlay SHA, tested product SHA와
+equivalence를 Handoff/Evidence에서 분리하며 candidate whole-tree equivalence를
+주장하지 않는다.
 
 ## Human-assisted handoff
 
@@ -223,13 +256,19 @@ Validation-only Task에는 제품 PR이 없으며, 사내 결과를 받은 뒤 C
 
 ## Sanitized Internal Evidence 최소 형식
 
+Internal Validator는 사람이 이해할 수 있는 평문 설명을 먼저 제공하고, 마지막에
+수기 전달용 compact capsule을 덧붙인다. Capsule은 설명을 대체하지 않는다.
+`RAW=NO`는 실행 과정을 숨겼다는 뜻이 아니라 sanitized handoff/capsule에
+secret/raw 내부 자료를 싣지 않았다는 뜻이다. 허용된 subprocess/network의
+미관측 behavior에 대한 host-wide attestation은 아니다.
+
 ```text
 Role: INTERNAL_VALIDATOR
 Task ID:
 Session role:
 Instruction SHA:
 Candidate SHA:
-Environment alias:
+Environment alias: <sanitized Human-supplied label; not hostname/user/device ID>
 Capability matrix: YES / NO / UNKNOWN
 Commands or UI steps performed:
 Human steps completed:
@@ -237,12 +276,21 @@ Exit codes / PASS / FAIL / BLOCKED:
 Protocol/provider/model aliases:
 Failure classification:
 Reproducibility:
-Product diff / final git status:
+Product diff / fingerprint:
+Existing shared checkout final status: NOT_APPLICABLE / CLEAN / DIRTY
 Sanitized observation:
-Secrets/raw evidence exported: NO
-Git write performed: NO
+Secrets/raw evidence included in sanitized handoff: NO
+Agent-requested GitHub/remote write: NONE / YES
+Agent-authored source/history: NONE / YES
+Agent-targeted existing shared checkout mutation: NONE / YES
+Disposable local Git/workspace write: YES / NO
+Agent-requested runtime/config/service action: NONE / YES
+Unobserved child side effects: NOT_APPLICABLE / NOT_OBSERVED / NOT_CLAIMED
 Next Task started: NO
 ```
+
+Lifecycle/subprocess가 허용된 경우 이 Evidence는 host-wide 무변경 attestation이
+아니다. Agent가 요청하거나 관찰한 범위와 관찰하지 않은 child effect를 분리한다.
 
 외부로 반환하지 않는 항목:
 

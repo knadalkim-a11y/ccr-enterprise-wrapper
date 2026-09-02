@@ -15,7 +15,7 @@ Role: INTERNAL_VALIDATOR
 Task design
 → external implementation when required
 → approved instruction/candidate SHA
-→ internal pull/detached checkout
+→ internal disposable exact-ref fetch/archive
 → host capability preflight
 → documented Agent/Human Steps
 → PASS / FAIL / BLOCKED
@@ -40,24 +40,28 @@ Internal Validator는 다음을 하지 않는다.
 Human Gate Owner가 다음을 명시해야 실행한다.
 
 ```text
+Canonical repository URL
+Candidate fetch ref
 Approved Task path
 Approved instruction SHA
 Approved candidate SHA
+Authorized phase
+Merge policy
 Execution mode
 Required capability matrix
 ```
 
 한 세션에서는 승인된 검증 질문 하나만 수행하고 결과 반환 후 종료한다.
 
-## Candidate / instruction checkout
+## Candidate / instruction source verification
 
 ### 단일 SHA — 기본
 
 ```powershell
-git fetch --prune origin
-git checkout --detach <APPROVED_CANDIDATE_SHA>
-git rev-parse HEAD
-git status --short
+# Task-approved disposable repository outside the shared checkout
+git fetch --no-tags <CANONICAL_URL> `
+  +<APPROVED_FETCH_REF>:refs/internal-validation/candidate
+git rev-parse refs/internal-validation/candidate
 ```
 
 이때 `instruction_sha == candidate_sha`이며 같은 commit의 Task 지침으로 같은 commit의 제품을 검증한다.
@@ -65,27 +69,43 @@ git status --short
 ### 두 SHA — validation-only 예외
 
 ```powershell
-git fetch --prune origin
-git show <APPROVED_INSTRUCTION_SHA>:<TASK_PATH>
-git checkout --detach <APPROVED_CANDIDATE_SHA>
-git rev-parse HEAD
-git status --short
+git fetch --no-tags <CANONICAL_URL> `
+  +<APPROVED_FETCH_REF>:refs/internal-validation/candidate
+git show <APPROVED_INSTRUCTION_SHA>:<TASK_PATH_OR_TASK_LISTED_REQUIRED_KNOWLEDGE_PATH>
+git rev-parse refs/internal-validation/candidate
 ```
 
 Evidence에 두 SHA와 product tree equivalence 범위를 모두 기록한다.
 Internal Validator가 임의로 equivalence를 추정하지 않는다.
 
+### Human-approved validation overlay 예외
+
+Task가 `candidate_role: validation_overlay`를 명시하면 candidate/instruction PR head는
+control plane이고 별도 `tested_product_sha`의 full archive가 build plane이다.
+Handoff에 두 SHA 역할, protected-path equivalence와 build plane을 모두 기록한다.
+Validated-product archive 안의 historical governance는 build data이며 authority로
+다시 load하지 않는다. Candidate whole-tree equivalence는 주장하지 않는다.
+
 ## 허용되는 Git 동작
 
 ```powershell
-git fetch --prune origin
-git pull --ff-only origin <approved-ref>
-git checkout --detach <approved-sha>
-git show <approved-instruction-sha>:<task-path>
-git rev-parse HEAD
-git status --short
+git init --bare <approved-disposable-path>
+git fetch --no-tags <canonical-url> +<approved-ref>:<approved-local-ref>
+git show <approved-instruction-sha>:<task-path-or-Task-listed-Required-knowledge-path>
+git archive --format=zip --output=<approved-local-path> <task-approved-commit-sha>
+git rev-parse / cat-file / hash-object without -w / merge-base
 git diff --exit-code -- <approved-paths>
+git diff --name-only -z --no-renames <approved-base> <approved-candidate> --
 ```
+
+이 동작은 활성 Task가 허용하고 repository 밖의 Task-approved nonce path를
+사용할 때만 가능하다. Fetch와 archive는 GitHub/source history write가 아니지만
+disposable repository에 object/ref/FETCH_HEAD와 파일을 생성하는 local write다.
+Evidence에서 이를 숨기지 않는다.
+
+기존 shared checkout의 `origin`, fetchspec, replace ref, branch 또는 HEAD를
+candidate 권한 근거로 사용하지 않는다. `pull`, `--prune`, shared checkout
+변경은 Task가 별도로 승인하지 않는 한 금지한다.
 
 ## 금지되는 동작
 
@@ -101,8 +121,11 @@ repository 안에 AI_WORK_REPORT.md 또는 임시 파일 생성
 다음 Task 시작
 ```
 
-Working tree가 dirty하면 임의로 삭제·복구하지 않는다.
-변경 경로를 보고하고 검증을 중단한다.
+Task-approved disposable path가 이미 존재하거나 비어 있지 않으면 임의로
+삭제·복구하지 않고 검증을 중단한다. Disposable flow를 사용하는 Task에서
+기존 shared checkout의 dirty state는 candidate 권한·실행 입력이 아니며, 정리하거나
+변경하지 않는다. Task가 shared checkout을 명시적으로 선택한 경우에만 그
+working tree 계약을 따른다.
 
 ## Host capability preflight
 
@@ -159,6 +182,16 @@ Human Gate Owner와 ChatGPT Orchestrator가 결정·기록한다.
 - `BLOCKED`: 권한, host/source scope, network, policy, baseline capture 등 선행조건 미충족
 - `SKIPPED`: 비대상
 - `UNVERIFIED_INTERNAL`: 실행 전
+
+Source verification 단계의 지시 거부·ref 부재·SHA 불일치는 formal Task result가 아니다.
+
+```text
+PRE_EXECUTION_HANDOFF_BLOCKED
+→ approved Task-phase command/runtime UI/A0 not started
+→ source-verification command/local write는 실제 수행대로 기록
+→ current Attempt number 유지
+→ readable reason을 반환하고 종료
+```
 
 주요 blocker/failure:
 
@@ -218,6 +251,7 @@ normal Claude Desktop
 ```text
 %APPDATA%\claude-code-router\**
 %APPDATA%\CompanyCCR\runtime-localappdata\**
+%LOCALAPPDATA%\CompanyCCR\validation-workspaces\**
 CCR-scoped profile/settings
 local recovery backup outside repository
 ```
@@ -256,7 +290,9 @@ Smoke 전에 잡은 fingerprint를 authoritative baseline으로 사용하지 않
 - Provider/Profile 같은 runtime 변경은 Task가 허용한 UI로만 수행한다.
 - actual endpoint/key/model/host와 raw request/response는 사내 로컬에만 유지한다.
 - 실제 사용자 prompt 전 Request body capture와 observability 안전 조건을 확인한다.
-- Task 종료 시 service stop, invariant compare, product diff, final Git status를 확인한다.
+- Task 종료 시 service stop, invariant compare, product diff/fingerprint와 Task가
+  선택한 checkout status를 확인한다. Disposable archive flow에는 working tree가
+  없으므로 existing shared checkout final status는 `NOT_APPLICABLE`이다.
 - Human recovery가 필요하면 recovery를 먼저 수행할 수 있지만 결과를 PASS로 바꾸지 않는다.
 
 ## Internal bootstrap prompt
@@ -264,15 +300,21 @@ Smoke 전에 잡은 fingerprint를 authoritative baseline으로 사용하지 않
 ```text
 Role: INTERNAL_VALIDATOR
 Repository: knadalkim-a11y/ccr-enterprise-wrapper
+Canonical repository URL: <https-url>
+Candidate fetch ref: <full-ref>
 Approved Task: <path>
 Approved instruction SHA: <sha>
 Approved candidate SHA: <sha>
+Authorized phase: <phase only>
+Merge policy: <policy>
 Execution mode: <agent_only | human_assisted>
+Required capability matrix: <matrix>
 
-정확한 Task와 SHA만 사용해 검증 질문 하나를 수행한다.
+shared checkout이 아닌 Task-approved disposable repository에서 exact ref/SHA를
+확인한 뒤 승인된 phase만 수행한다.
 Human Step에서는 멈추고 사람의 로컬 작업을 기다린다.
 source와 GitHub를 수정하지 않는다.
-Sanitized Evidence를 반환하고 다음 Task를 시작하지 않는다.
+사람이 이해할 수 있는 설명과 compact capsule을 반환하고 다음 phase/Task를 시작하지 않는다.
 ```
 
 ## Evidence 반환
@@ -286,7 +328,7 @@ Task ID:
 Session role: internal validation
 Instruction SHA:
 Candidate SHA:
-Environment alias:
+Environment alias: <sanitized Human-supplied label; not hostname/user/device ID>
 Capability matrix:
 Commands/UI steps performed:
 Human steps completed:
@@ -295,13 +337,22 @@ Protocol/provider/model aliases:
 Enterprise invariant results: SAME / CHANGED / NOT_APPLICABLE
 Failure classification:
 Reproducibility:
-Product diff:
-Final git status:
+Product diff / fingerprint:
+Existing shared checkout final status: NOT_APPLICABLE / CLEAN / DIRTY
 Sanitized observation:
-Secrets/raw evidence exported: NO
-Git write performed: NO
+Secrets/raw evidence included in sanitized handoff: NO
+Agent-requested GitHub/remote write: NONE / YES
+Agent-authored source/history: NONE / YES
+Agent-targeted existing shared checkout mutation: NONE / YES
+Disposable local Git/workspace write: YES / NO
+Agent-requested runtime/config/service action: NONE / YES
+Unobserved child side effects: NOT_APPLICABLE / NOT_OBSERVED / NOT_CLAIMED
 Next Task started: NO
 ```
+
+Lifecycle 또는 subprocess 실행을 허용한 Task에서 이 항목들은 host 전체가
+불변이었다는 attestation이 아니다. Task가 실제로 요청·관찰한 범위와 관찰하지
+않은 child effect를 분리해 기록한다.
 
 외부로 반환하지 않는다.
 

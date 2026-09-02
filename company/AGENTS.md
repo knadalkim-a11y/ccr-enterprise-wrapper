@@ -18,8 +18,11 @@
 - upstream 경로 수정은 Task가 허용하고 config/extension/wrapper로 해결 불가한 증거가 있을 때만 한다.
 - 가장 작은 vertical experiment로 다음 투자 결정을 위한 증거를 만든다.
 - V1 Task에서 V2 abstraction을 추가하지 않는다.
+- 모든 설계·repair·review에서 과설계 여부를 기본 확인한다. 현재 위험을 줄이지 않는 gate, 상태, attestation, script, 격리 계층은 `DEFER`한다.
+- 같은 안전성을 유지할 수 있으면 사람의 승인 왕복과 수기 Evidence 전달이 더 적은 절차를 선택한다.
 - 외부에서는 synthetic mock과 CCR 기존 test utility를 우선 사용한다.
 - 사내 검증은 product code 수정 없이 실행 가능해야 한다.
+- PR candidate가 기본 fetchspec으로 도달하지 않을 수 있으면 handoff에 canonical repository URL과 exact fetch ref를 포함하고, shared checkout 대신 Task-approved disposable repository를 사용한다.
 - Trap은 재현 또는 코드 근거, 회피법, 적용 버전, Task/commit 증거가 있을 때만 등록한다.
 - Task 파일이 Issue/PR보다 우선하는 유일한 요구사항 Source of Truth다.
 - 모델 순서는 serving availability를 따르며 과거 GLM-first/Gemma-first 가정을 자동 적용하지 않는다.
