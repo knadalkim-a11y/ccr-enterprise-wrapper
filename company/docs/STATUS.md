@@ -20,16 +20,19 @@
 - Stage: `V1-S1`
 - Active Task: `V1-S1-T00`
 - Active Task path: `company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md`
-- Status: `READY_FOR_INTERNAL_VALIDATION — A0_ONLY`
+- Machine status: `in_progress`; executable phase on this design head: `NONE`
+- Design status: `ATTEMPT_3_A0_RECORDED / H0_DESIGN_APPROVED / RUNTIME_CONTROLLER_PENDING`
 - T02: `EXTERNAL_PASS` — wrapper-only helper syntax PASS, synthetic/mock tests 159/159
 - Repair scope: T00 frontmatter의 exact `allowed_paths` only; protected CCR source/build/package paths unchanged and prohibited; candidate whole-tree build equivalence `NOT_CLAIMED`; A0 build plane은 full `97b73a9...`
 - T00 Attempt 1: `BLOCKED_POLICY — CONFIG_SAVE_PATH_UNAVAILABLE`; management start isolation PASS, config-save `NOT_TESTED`
 - T00 Attempt 2: `BLOCKED — BLOCKED_TOOLCHAIN_IDENTITY` at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910`; exact checkpoint not captured; console closed
-- Pre-execution handoff incident: Internal Sonnet rejected inconsistent authority before commands; formal Task result 없음; Attempt 3 remains `NOT_STARTED`
-- T00 Attempt 3: `NOT_STARTED`; new exact frozen-head source verification + A0 only pending Human handoff
-- External repair verification: A0 source-contract tests `11 PASS / 1 SKIP`; Windows PowerShell 5.1 parser/runtime `NOT_RUN_EXTERNAL`; unchanged T02 tests `159/159 PASS`
+- Pre-execution handoff incident: Internal Sonnet rejected inconsistent authority before commands; formal Task result 없음; 당시 Attempt 3는 시작되지 않음
+- T00 Attempt 3 at approved/repository-correlated `e16b4a90c7f5f7171905ad7c2993e8dcf6781353`: `A0_PASS_ONLY / INCOMPLETE / H0_NOT_STARTED`; Human confirmation `E16_OK`, normalized transcribed fields, Node `v24.15.0`, npm `11.12.1`, exit `0`, workspace `4b5fc32468f4a9c103af7686987e9b26`
+- A0 Evidence provenance: `HUMAN_TRANSCRIBED_SANITIZED_INTERNAL_VALIDATOR_OUTPUT`; capsule normalized by Orchestrator, not claimed verbatim; external independent rerun `NO`; PR #23 exact `e16...` correlation independently verified
+- External repair verification: combined tests `170 PASS / 0 FAIL / 1 expected SKIP`; unchanged T02 synthetic/mock tests `159/159 PASS`; exact `e16...` Windows PS5.1 A0 internally reported PASS
 - Coverage: management start isolation `TESTED_PASS`; config-save isolation `NOT_TESTED`
-- Goal: shared checkout을 변경하지 않는 exact overlay verification 뒤 full validated product `97b73a9...` archive에서 reviewed one-shot PS5.1 A0 install/typecheck/build만 수행하고 HOLD
+- H0 design: Human-assisted before-smoke/quiescence 뒤 active Sonnet을 종료하고, future reviewed one-shot PowerShell controller가 backup/baseline/runtime/T02/cleanup을 이어서 수행
+- Attempt 4: `NOT_STARTED`; controller implementation, new exact-head Human approval and source verification pending
 - Validated product commit: `97b73a9f4e1fb23d406bb987d0785cefa1f99966`
 - Last passed Gate: `V1-S0`
 
@@ -188,7 +191,7 @@ Enterprise before/during/after PASS
 | Router stop as rollback | REJECTED | observed persistent client config |
 | Dual command model | ACCEPTED_AS_V1_DEFAULT | `claude` vs `company-claude` |
 | Only-opened-from-CCR + CLI-only | ACCEPTED_AS_V1_DEFAULT | System default prohibited |
-| Runtime LOCALAPPDATA sandbox | START_ISOLATION_PASS_CONFIG_SAVE_READY_INTERNAL | V1-S1-T00 Attempt 1 + T02 External PASS |
+| Runtime LOCALAPPDATA sandbox | A0_PASS_ONLY_H0_DESIGN_APPROVED_RUNTIME_PENDING | V1-S1-T00 Attempts 1–3 + T02 External PASS |
 | GLM onboarding | DEFERRED | serving rollout |
 | Gateway completion/stream/tool | UNVERIFIED | later V1-S1 Tasks |
 | Claude Code isolated E2E | UNVERIFIED | V1-S2 |
@@ -221,18 +224,20 @@ local recovery backup outside repository
 
 - Management start isolation passed one Windows Attempt, but the wrapper-assisted config-save isolation has not run internally.
 - Attempt 2의 exact toolchain checkpoint는 old capsule로 확인할 수 없으며 stale console을 재사용하지 않는다.
-- 이전 Attempt 3 handoff는 명령 실행 전에 거부됐다. 현재 PR head가 아니라 새 repaired head/ref/SHA handoff가 필요하다.
+- Attempt 3 A0 PASS는 exact `e16...`에만 귀속된다. Evidence/H0 design commit이나 future runtime head에 자동 승계되지 않는다.
 - A0의 `npm ci` 자식은 pinned dependency lifecycle code 실행과 npm network access가 허용된 상태로 현재 Windows user 권한에서 실행된다. 실제 lifecycle child/connection 발생은 별도로 관찰했다고 주장하지 않는다. 별도 account/VM은 정책, account 동시 사용 또는 credential exposure 위험이 있을 때만 요구한다.
+- Attempt 4의 fresh `-Prepare`도 full `97b...` archive에서 npm ci/typecheck/build를 H0 전에 다시 수행하므로 새 exact-head handoff에서 같은 npm network/lifecycle/current-user risk를 별도로 승인해야 한다.
 - Tailwind v4 build는 repository-root text를 자동 탐색하므로 candidate의 governance/docs 변경도 full-head CSS build input이 될 수 있다. A0는 이 숨은 입력을 `97b73a9...` full archive build plane으로 분리하며 current main/PR full-head build equivalence 또는 merge safety를 주장하지 않는다. Eventual merge/release 전 exact-head를 새 product로 검증할지 Tailwind input boundary를 별도 product Task에서 고정할지 결정해야 한다.
-- A0 script의 source contract는 외부에서 검토됐지만 Windows PowerShell 5.1 parser와 실제 Windows 실행은 아직 사내 exact-head source verification/A0에서 확인해야 한다.
-- A0-only head에는 executable H0/A1+ procedure가 없다. A0 Evidence 뒤 최소 runtime procedure를 별도로 설계하고 새 exact head/Attempt로 검증해야 한다.
+- Exact `e16...`의 Windows PowerShell 5.1 parser/runtime A0는 Human-transcribed sanitized Evidence상 PASS다. 이는 external independent rerun이나 successor-head PASS가 아니다.
+- H0 minimal design은 승인됐지만 reviewed runtime controller가 아직 없고 executable phase는 `NONE`이다. H0를 단독 실행하면 quiescence가 stale해지므로 controller head를 먼저 구현·동결해야 한다.
 - Unfinished onboarding has no supported stock UI path to the required cleanup without the forbidden `Connect agent` action.
 - Human Gate rejected CCR `packages/**` changes; the repair must be Company-owned under `company/**`.
 - Existing CCR runtime config may contain stale global/System-default profile state; Attempt 1 did not verify its saved count.
+- Stock default `requestLogBodyCapture="all"`과 T02 helper의 required fixed point `"none"`가 실제 config에서 충돌할 수 있다. Internal state는 미확인이며 future no-save preflight가 `BLOCKED_RUNTIME_SURFACE`로 판단하게 둔다.
 - The wrapper-only helper passed 159/159 external synthetic/mock tests but has not touched internal runtime data.
-- Future runtime must still prove fresh service ownership, stopped Gateway, relevant current-user writer quiescence, Enterprise invariance and unconditional cleanup.
+- Future runtime must still prove fresh service ownership, stopped Gateway, relevant current-user writer quiescence, Enterprise invariance and unconditional cleanup. Active Sonnet도 writer이므로 source materialization 뒤 종료하고 plain PowerShell controller를 사용해야 한다.
 - 다른 Windows 사용자 세션 전체 종료는 필요 없지만 같은 Windows account 동시 사용 또는 relevant process/port owner 불명확은 runtime blocker다.
-- The single nonce validation workspace remains local for Gate review; its sanitized 32-hex ID must be returned so Human cleanup later targets that exact nonce only.
+- Attempt 3 nonce `4b5fc32468f4a9c103af7686987e9b26`은 Evidence review용으로 유지한다. 새 ref를 fetch하거나 runtime root로 자동 재사용하지 않고, cleanup은 나중 exact nonce만 대상으로 한다.
 - The Management RPC is pinned-version source surface rather than a permanent public API and must be revalidated on upstream update.
 - Provider persistence, local gateway completion, Streaming, Tools and error classification remain unverified.
 - GLM rollout is pending.
@@ -261,13 +266,14 @@ local recovery backup outside repository
 ## Exact next action
 
 ```text
-1. External source-contract review를 통과한 simplified A0-only repair를 새 exact PR head로 동결한다.
-2. Human Gate가 canonical URL, refs/pull/23/head, main/candidate/instruction/product SHA, `A0_ONLY`, `agent_only`, capability, same-account/VM precondition과 npm network/lifecycle risk 수용을 한 번 승인한다.
-3. Internal Validator가 하나의 self-contained prompt에서 disposable source verification 후 reviewed A0 script만 실행한다.
-4. readable explanation + compact A0 capsule을 반환하고 종료한다.
-5. CHATGPT_ORCHESTRATOR와 Human Gate가 Evidence를 검토한다.
+1. Human Gate가 이 frozen exact design-head SHA를 `implementation_base_sha`로 고정하고, 두 controller artifact와 다섯 canonical governance file만 쓰는 bounded implementation lane을 별도로 승인한다; CCR packages/**는 수정하지 않는다.
+2. External Codex가 controller/test를 구현·검토하고 같은 final runtime head 안에서 T00/T02/project-state/STATUS/Gate를 `ready_internal`, controller `IMPLEMENTED / EXTERNAL_REVIEW_PASS`, `ATTEMPT_4_PREPARE_AND_H0_RUNTIME_AFTER_EXACT_HEAD_HUMAN_APPROVAL`로 동기화한다. T02는 `EXTERNAL_PASS`, helper internal `NOT_STARTED`를 유지한다.
+3. 그 exact runtime head를 동결한다. 승인 정보를 넣기 위한 docs-after-freeze commit은 만들지 않는다.
+4. Human Gate가 frozen exact SHA, Attempt 4, human_assisted mode, 두 capability와 npm network/lifecycle/current-user risk를 별도로 승인하면 repository에 기록된 conditional phase가 실행 가능해진다.
+5. Internal Sonnet은 새 nonce source verification과 controller `-Prepare` build, 한 줄 `-Run` handoff 뒤 종료한다. 그 다음에만 Human H0와 plain PowerShell runtime을 끊김 없이 수행한다.
+6. Human Gate가 compact runtime Evidence를 검토한 뒤 recovery가 불필요하다고 승인하면 exact post-Gate backup cleanup을 실행한다. Cleanup PASS 전에는 T00 `ACCEPTED`/merge로 진행하지 않는다.
 ```
 
-A0 검토 전 H0 또는 A1+ procedure를 만들거나 실행하지 않는다. A0 PASS도 T00 PASS,
-T02 internal PASS 또는 repair PR merge 승인이 아니다. T00 Human decision `ACCEPTED`
-전에는 T01을 시작하지 않는다.
+이번 head는 H0 design까지만 승인하며 runtime controller 구현, H0 실행, A1+, T02 internal
+PASS, merge 또는 T01을 승인하지 않는다. T00 Human decision `ACCEPTED` 전에는 T01을
+시작하지 않는다.

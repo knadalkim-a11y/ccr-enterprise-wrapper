@@ -11,6 +11,11 @@ const TASK_PATH = fileURLToPath(
 );
 const T02_HELPER_PATH = fileURLToPath(new URL("../scripts/t00-safe-config-save.mjs", import.meta.url));
 const T02_TEST_PATH = fileURLToPath(new URL("./t00-safe-config-save.test.mjs", import.meta.url));
+const POST_A0_DESIGN_PATHS = [
+  "company/project-state.yml",
+  "company/scripts/t00-runtime-controller.ps1",
+  "company/tests/t00-runtime-controller-contract.test.mjs"
+];
 const [script, taskSource, t02Helper, t02Test] = await Promise.all([
   readFile(SCRIPT_PATH, "utf8"),
   readFile(TASK_PATH, "utf8"),
@@ -19,7 +24,8 @@ const [script, taskSource, t02Helper, t02Test] = await Promise.all([
 ]);
 
 // Static source-contract checks only. The conditional Windows test parses with
-// Windows PowerShell 5.1; actual A0 runtime behavior remains internally unverified.
+// Windows PowerShell 5.1. Attempt 3's exact e16 internal A0 Evidence is recorded in
+// the Task; this external test does not independently rerun or broaden that result.
 
 function hasAll(...patterns) {
   for (const pattern of patterns) {
@@ -105,7 +111,7 @@ test("A0 pins candidate scope, protected paths, and the validated build plane", 
     /^allowed_paths:\n(?<body>(?:  - .+\n)+)forbidden_paths:/m
   );
   assert.ok(taskAllowedBlock, "Task allowed_paths block must be parseable");
-  const expectedAllowed = [
+  const currentTaskAllowed = [
     ...taskAllowedBlock.groups.body.matchAll(/^  - (.+)$/gm)
   ].map((match) => match[1]);
   const scriptAllowedBlock = script.match(
@@ -115,7 +121,14 @@ test("A0 pins candidate scope, protected paths, and the validated build plane", 
   const actualAllowed = [
     ...scriptAllowedBlock.groups.body.matchAll(/    "([^"]+)"/g)
   ].map((match) => match[1]);
-  assert.deepEqual(actualAllowed, expectedAllowed);
+  const historicalA0Allowed = currentTaskAllowed.filter(
+    (candidatePath) => !POST_A0_DESIGN_PATHS.includes(candidatePath)
+  );
+  assert.deepEqual(actualAllowed, historicalA0Allowed);
+  assert.deepEqual(
+    currentTaskAllowed.filter((candidatePath) => POST_A0_DESIGN_PATHS.includes(candidatePath)),
+    POST_A0_DESIGN_PATHS
+  );
 });
 
 test("A0 verifies its own candidate bytes and materializes a nonce archive", () => {

@@ -68,11 +68,11 @@ Runtime invariants at that decision: fresh service ownership + relevant-writer q
 Status of old A2/A3 labels: RETIRED_BY_A0_ONLY_REPAIR
 ```
 
-The final Human decision remains pending until External PASS, a later exact-head T00
-runtime Attempt, and Human Gate review. Attempt 2 stopped at A0 with
-`BLOCKED_TOOLCHAIN_IDENTITY`; the helper itself remains internally unexecuted. The
-current repaired head authorizes A0 install/typecheck/build only and does not execute
-this helper.
+The final Human decision remains pending until a later exact-head T00 runtime Attempt
+and Human Gate review. Attempt 3 exact `e16b4a90...` A0 is recorded as
+`A0_PASS_ONLY / INCOMPLETE / H0_NOT_STARTED`; the helper itself remains internally
+unexecuted. H0 minimal design is approved, but the runtime controller and H0/helper
+execution are not implemented or authorized.
 
 ## Validation question
 
@@ -159,7 +159,7 @@ A0 Evidence 뒤 별도 exact head에서 검토한다.
 - Loopback-only authenticated Management RPC.
 - Fail-closed preflight and exact allowlisted config transform.
 - Compact sanitized output for the keyboard-only Evidence boundary.
-- Exact repaired PR head handoff to T00 Attempt 3 A0 only; helper execution remains deferred.
+- Preserve exact Attempt 3 A0 Evidence while a future T00 Attempt 4 runtime head integrates this helper; helper execution remains deferred.
 
 Role-owned canonical transition after External PASS:
 
@@ -364,7 +364,7 @@ They must cover:
 - [ ] no forbidden or explicit Gateway-control RPC invoked
 - [ ] synthetic/mock tests pass
 - [ ] compact sanitized output only
-- [ ] T00 Attempt 3 source verification + A0 is the only newly authorized internal validation; helper runtime remains `NOT_STARTED`
+- [ ] T00 Attempt 3 exact `e16...` A0 is recorded PASS-only; current authorized phase is `NONE` and helper runtime remains `NOT_STARTED`
 - [ ] T01 remains blocked
 
 ## Stop conditions
@@ -394,9 +394,10 @@ They must cover:
 
 After External PASS, Human Gate supplies the exact PR head as candidate/instruction SHA.
 T00 Attempt 2 stopped at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910` with
-`BLOCKED_TOOLCHAIN_IDENTITY`; no helper/runtime service execution occurred. A
-simplified Company-owned A0-only repair is followed by T00 Attempt 3 source verification and A0 on
-the new exact head. Helper runtime remains deferred until that Evidence is reviewed.
+`BLOCKED_TOOLCHAIN_IDENTITY`; no helper/runtime service execution occurred. T00 Attempt 3
+then completed A0 on exact `e16b4a90...`, but did not invoke the helper/service/H0.
+Future Attempt 4 requires a reviewed Company-owned controller, new exact-head approval and
+source verification. Helper runtime remains deferred.
 The repair PR must not merge before T00 PASS and Human decision.
 
 ## Sanitized evidence template
@@ -426,20 +427,22 @@ Next Task started: NO
 
 | Attempt | Actor / session role | Candidate | Instruction | External | Internal | Recommendation |
 |---:|---|---|---|---|---|---|
-| 1 | EXTERNAL_CODEX / wrapper-only implementation | final repair PR head supplied by Human Gate | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, protected CCR source/build/package paths equal tested product; candidate/full-head build equivalence not tested or claimed | helper runtime `NOT_STARTED`; T00 Attempt 2 A0 `BLOCKED_TOOLCHAIN_IDENTITY`; later Sonnet handoff rejected before commands and did not consume Attempt 3 | `READY_FOR_INTERNAL_VALIDATION` — freeze new exact head and run T00 Attempt 3 source verification + A0 only |
+| 1 | EXTERNAL_CODEX / wrapper-only implementation | helper/test blobs frozen in PR #23 | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, protected CCR source/build/package paths equal tested product; candidate/full-head build equivalence not tested or claimed | helper runtime `NOT_STARTED`; T00 Attempt 3 exact `e16...` A0 `PASS_ONLY` without service/helper invocation | `RUNTIME_CONTROLLER_PENDING` — integrate in a new exact Attempt 4 head; current execution authorization `NONE` |
 
 ## Evidence / limitations
 
 T00 Attempt 1 remains the only internal service/runtime execution Evidence so far.
 Attempt 2 added only an A0 `BLOCKED_TOOLCHAIN_IDENTITY` capsule; exact checkpoint was
 not captured, post-block diagnostic was not run, and its console is closed.
+Attempt 3 exact `e16b4a90...` passed source verification/install/typecheck/build A0 only;
+it did not add helper/runtime service coverage.
 Human Gate activated this Task on `2026-09-01`; implementation and synthetic tests passed only within the declared paths.
 The helper remains validation-only and has not run against internal runtime data.
 The pinned Management RPC dependency must be revalidated on every upstream update.
 
 ## Agent recommendation
 
-`READY_FOR_INTERNAL_VALIDATION — FREEZE NEW EXACT HEAD; RUN T00 ATTEMPT 3 A0 ONLY`
+`RUNTIME_CONTROLLER_PENDING — H0 DESIGN APPROVED; FREEZE A NEW EXACT ATTEMPT 4 HEAD BEFORE INTERNAL EXECUTION`
 
 ## Human decision
 
