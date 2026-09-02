@@ -72,7 +72,9 @@ The final Human decision remains pending until a later exact-head T00 runtime At
 and Human Gate review. Attempt 3 exact `e16b4a90...` A0 is recorded as
 `A0_PASS_ONLY / INCOMPLETE / H0_NOT_STARTED`; the helper itself remains internally
 unexecuted. H0 minimal design is approved, but the runtime controller and H0/helper
-execution are not implemented or authorized.
+execution are not yet internally authorized. The controller is now `IMPLEMENTED /
+EXTERNAL_REVIEW_PASS`; Attempt 4 remains `NOT_STARTED` until the frozen exact head receives
+separate Human approval.
 
 ## Validation question
 
@@ -122,8 +124,8 @@ Stock `v3.0.22` RPC는 daemon이 실제로 상속한 `LOCALAPPDATA`를 노출하
 Future T00 runtime instructions가 absent state에서 sandbox `LOCALAPPDATA`로 fresh
 daemon을 시작한 사실을 증명하고, relevant CCR management/client writer를 quiesce하며,
 결과와 관계없이 actual Enterprise/Claude-3p invariant와 cleanup을 검증하는 범위에서만
-사용한다. 기존 A0–A3 same-PowerShell 계약은 retired됐으며 새 runtime controller는
-A0 Evidence 뒤 별도 exact head에서 검토한다.
+사용한다. 기존 A0–A3 same-PowerShell 계약은 retired됐으며 reviewed runtime controller는
+별도 exact head의 Human 승인 뒤에만 실행한다.
 또한 T00은 daemon 시작 직전에 whole legacy Windows config directory와 active/home legacy JSON, legacy API-key DB/sidecars 및 onboarding marker가 absent인지 metadata-only로 확인해야 한다. Canonical config directory, `config.sqlite`와 optional sidecars의 bounded/non-reparse metadata 검사는 DB row/schema fixed point나 첫 open의 무기록성을 증명하지 않으며, helper-only 검사는 import/migration 뒤라 너무 늦다.
 
 이 제한은 CCR source를 수정하지 않는 Human 결정의 명시적 trade-off다.
@@ -159,7 +161,7 @@ A0 Evidence 뒤 별도 exact head에서 검토한다.
 - Loopback-only authenticated Management RPC.
 - Fail-closed preflight and exact allowlisted config transform.
 - Compact sanitized output for the keyboard-only Evidence boundary.
-- Preserve exact Attempt 3 A0 Evidence while a future T00 Attempt 4 runtime head integrates this helper; helper execution remains deferred.
+- Preserve exact Attempt 3 A0 Evidence; the reviewed T00 Attempt 4 controller now integrates this helper, while helper execution remains deferred.
 
 Role-owned canonical transition after External PASS:
 
@@ -191,7 +193,7 @@ The orchestrator transition does not expand the helper implementation scope and 
 
 0. Invoke only inside a future Human-approved T00 runtime procedure after that procedure proves no pre-existing service/backup or legacy import/migration source, quiesces relevant same-account CCR/Claude writers, and rechecks those guards immediately before freshly starting the daemon with sandbox `LOCALAPPDATA` from the exact archived-source working directory. The helper does not independently attest daemon `LOCALAPPDATA`, legacy pre-start absence, DB row/schema fixed point, or runtime cwd and is not a production launcher.
 1. Accept only no argument or one exact `--apply`; invalid arguments return a fixed usage category without echoing input. Default mode is a **no-`saveConfig` preflight**, not an inert/read-only claim.
-2. Require Windows and an absolute `APPDATA`. Reject `CCR_INTERNAL_APP_DATA_DIR`, `CCR_INTERNAL_HOME_DIR`, `CCR_INTERNAL_USER_DATA_DIR`, `CCR_GATEWAY_ENTRY`, `CCR_MODELS_JSON_PATH`, `CCR_MODEL_CATALOG_PATH`, `CCR_NODE_BIN`, `CCR_UPSTREAM_PROXY_URL`, `CCR_WEB_ALLOWED_ORIGINS`, `CCR_WEB_AUTH_TOKEN`, `NODE_COMPILE_CACHE`, `NODE_DEBUG`, `NODE_OPTIONS`, `NODE_REDIRECT_WARNINGS`, `NODE_V8_COVERAGE`, `npm_config_node_options` and `npm_config_script_shell`. Never fall back to restored `LOCALAPPDATA`. The future T00 runtime controller must prove these values are absent before its first runtime Node/service process and again immediately before helper spawn; helper-side rejection is defense in depth, not a claim that Node startup artifacts can be prevented from JavaScript.
+2. Require Windows and an absolute `APPDATA`. Reject `CCR_INTERNAL_APP_DATA_DIR`, `CCR_INTERNAL_HOME_DIR`, `CCR_INTERNAL_USER_DATA_DIR`, `CCR_GATEWAY_ENTRY`, `CCR_MODELS_JSON_PATH`, `CCR_MODEL_CATALOG_PATH`, `CCR_NODE_BIN`, `CCR_UPSTREAM_PROXY_URL`, `CCR_WEB_ALLOWED_ORIGINS`, `CCR_WEB_AUTH_TOKEN`, `NODE_COMPILE_CACHE`, `NODE_DEBUG`, `NODE_OPTIONS`, `NODE_REDIRECT_WARNINGS`, `NODE_V8_COVERAGE`, `npm_config_node_options` and `npm_config_script_shell`. Never fall back to restored `LOCALAPPDATA`. The T00 runtime controller must prove these values are absent before its first runtime Node/service process and again immediately before helper spawn; helper-side rejection is defense in depth, not a claim that Node startup artifacts can be prevented from JavaScript.
 3. Read only `%APPDATA%\claude-code-router\service.json`, with file-type and size limits. Require the pinned exact state shape, positive numeric PID, live process, `profileManaged === false`, `startGateway === false`, nonempty service token, valid `startedAt`, and no unexpected keys.
 4. Require `%APPDATA%\claude-code-router\claude-app-gateway-backup.json` to be absent before any RPC that can save.
 5. Accept only a canonical `http://127.0.0.1:<explicit-port>/?ccr_web_token=<one-nonempty-value>` URL: root path, no userinfo, fragment, extra/duplicate query or DNS hostname. Send the token only as `x-ccr-web-auth` to fixed `/api/ccr/rpc`.
@@ -216,9 +218,9 @@ The orchestrator transition does not expand the helper implementation scope and 
 21. Never retry a mutation. Any timeout, disconnect, malformed/oversized response or RPC error after save dispatch is `INDETERMINATE_SAVE` with `SAVE=UNKNOWN`; it is not a safe pre-save block.
 22. After a confirmed save response, call `getConfig([])`, `getOnboardingFinished([])` and `getGatewayStatus([])`. Require returned and re-read config exact-equal to the expected target, onboarding unchanged, and post Gateway state still `stopped` with configured loopback endpoints, no PID/external ownership/network endpoint/error/start timestamp. Any `running`, `starting` or `error` state is a post-save failure.
 23. Do not call `setOnboardingFinished`, `applyProfile`, `applyClaudeAppGateway`, `openProfile`, Gateway controls, Provider probes, connectivity checks, model catalog methods or model APIs.
-24. Gateway start is prohibited. The pinned source proof and exact profile-only diff must keep the Stock save on `gatewayService.updateConfig`; any observed start is `POSTCONDITION_FAILURE`, followed by the future T00 runtime controller's unconditional cleanup/invariance step. The helper must not invoke or send a request through the Gateway.
+24. Gateway start is prohibited. The pinned source proof and exact profile-only diff must keep the Stock save on `gatewayService.updateConfig`; any observed start is `POSTCONDITION_FAILURE`, followed by the T00 runtime controller's unconditional cleanup/invariance step. The helper must not invoke or send a request through the Gateway.
 25. Never print, persist or return the management URL/token, service token, full config, Provider fields, API keys, model IDs, paths, raw RPC bodies or server error text.
-26. Do not stop the service after save or an indeterminate save; the future T00 runtime controller's unconditional cleanup/invariance step owns fingerprint, stock stop, captured-PID death proof and cleanup. That step is required for every helper result, especially `SAVE=UNKNOWN`.
+26. Do not stop the service after save or an indeterminate save; the T00 runtime controller's unconditional cleanup/invariance step owns fingerprint, stock stop, captured-PID death proof and cleanup. That step is required for every helper result, especially `SAVE=UNKNOWN`.
 27. On any ambiguity observed before mutation dispatch, output a fixed `BLOCKED` category and guarantee no save dispatch. Client-side snapshot checks do not claim to replace unavailable server-side CAS.
 28. Output exactly one compact sanitized line and a documented process exit code.
 
@@ -343,7 +345,7 @@ They must cover:
 - [ ] validation-only scope and unavailable daemon-LOCALAPPDATA/CAS attestation limitation recorded
 - [ ] default invocation makes no `saveConfig` call
 - [ ] apply requires explicit flag
-- [ ] no pre-existing service and fresh state/PID proved by a future approved T00 runtime controller
+- [ ] no pre-existing service and fresh state/PID proved by the exact-head Human-approved T00 runtime controller
 - [ ] pinned app identity/config root verified
 - [ ] stale Claude App backup fail-closed
 - [ ] loopback HTTP/auth-header/service identity/Gateway pre-state fail-closed
@@ -364,7 +366,7 @@ They must cover:
 - [ ] no forbidden or explicit Gateway-control RPC invoked
 - [ ] synthetic/mock tests pass
 - [ ] compact sanitized output only
-- [ ] T00 Attempt 3 exact `e16...` A0 is recorded PASS-only; current authorized phase is `NONE` and helper runtime remains `NOT_STARTED`
+- [ ] T00 Attempt 3 exact `e16...` A0 is recorded PASS-only; the conditional Attempt 4 phase still requires frozen exact-head Human approval and helper runtime remains `NOT_STARTED`
 - [ ] T01 remains blocked
 
 ## Stop conditions
@@ -396,8 +398,8 @@ After External PASS, Human Gate supplies the exact PR head as candidate/instruct
 T00 Attempt 2 stopped at A0 on `c2459b90182041afdb7b9c0cf44149494b30f910` with
 `BLOCKED_TOOLCHAIN_IDENTITY`; no helper/runtime service execution occurred. T00 Attempt 3
 then completed A0 on exact `e16b4a90...`, but did not invoke the helper/service/H0.
-Future Attempt 4 requires a reviewed Company-owned controller, new exact-head approval and
-source verification. Helper runtime remains deferred.
+Attempt 4 now has a reviewed Company-owned controller, but still requires frozen exact-head
+Human approval and source verification. Helper runtime remains deferred and `NOT_STARTED`.
 The repair PR must not merge before T00 PASS and Human decision.
 
 ## Sanitized evidence template
@@ -427,7 +429,7 @@ Next Task started: NO
 
 | Attempt | Actor / session role | Candidate | Instruction | External | Internal | Recommendation |
 |---:|---|---|---|---|---|---|
-| 1 | EXTERNAL_CODEX / wrapper-only implementation | helper/test blobs frozen in PR #23 | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, protected CCR source/build/package paths equal tested product; candidate/full-head build equivalence not tested or claimed | helper runtime `NOT_STARTED`; T00 Attempt 3 exact `e16...` A0 `PASS_ONLY` without service/helper invocation | `RUNTIME_CONTROLLER_PENDING` — integrate in a new exact Attempt 4 head; current execution authorization `NONE` |
+| 1 | EXTERNAL_CODEX / wrapper-only implementation | helper/test blobs frozen in PR #23 | same as candidate | `PASS` — syntax, 159/159 synthetic/mock tests, protected CCR source/build/package paths equal tested product; candidate/full-head build equivalence not tested or claimed | helper runtime `NOT_STARTED`; T00 Attempt 3 exact `e16...` A0 `PASS_ONLY` without service/helper invocation | `CONTROLLER_EXTERNAL_PASS` — Attempt 4 remains `NOT_STARTED` until frozen exact-head Human approval |
 
 ## Evidence / limitations
 
@@ -442,7 +444,7 @@ The pinned Management RPC dependency must be revalidated on every upstream updat
 
 ## Agent recommendation
 
-`RUNTIME_CONTROLLER_PENDING — H0 DESIGN APPROVED; FREEZE A NEW EXACT ATTEMPT 4 HEAD BEFORE INTERNAL EXECUTION`
+`CONTROLLER EXTERNAL PASS — FREEZE AND HUMAN-APPROVE THE EXACT ATTEMPT 4 HEAD BEFORE INTERNAL EXECUTION`
 
 ## Human decision
 

@@ -3,7 +3,7 @@ id: V1-S1-T00
 stage: V1-S1
 title: Prove CCR runtime sandbox and Enterprise baseline invariance
 kind: spike
-status: in_progress
+status: ready_internal
 primary_actor: INTERNAL_VALIDATOR
 execution_mode: human_assisted
 implementation_required: true
@@ -13,8 +13,9 @@ candidate_sha: pending_exact_runtime_head
 instruction_sha: same_as_candidate
 candidate_role: validation_overlay
 tested_product_sha: 97b73a9f4e1fb23d406bb987d0785cefa1f99966
+implementation_base_sha: e6fe7e3b00dd42311cb30d88472949b03d18a2aa
 merge_policy: internal_pass_required
-authorized_phase: NONE
+authorized_phase: ATTEMPT_4_PREPARE_AND_H0_RUNTIME_AFTER_EXACT_HEAD_HUMAN_APPROVAL
 depends_on:
   - V1-S0-T02
 unblocks:
@@ -60,33 +61,49 @@ forbidden_paths:
   - build/**
   - package.json
   - package-lock.json
-human_decision: retry
+human_decision: pending
 ---
 
 # Prove CCR Runtime Sandbox and Enterprise Baseline Invariance
 
 ## Current authorization boundary
 
-이 head는 다음 두 사실만 canonical하게 기록한다.
+이 head는 기존 A0/H0 설계와 externally reviewed runtime controller 구현을 함께
+canonical하게 기록한다.
 
 ```text
 Attempt 3 at e16b4a90...: A0_PASS_ONLY / INCOMPLETE / H0_NOT_STARTED
 H0 minimal design: APPROVED
+Runtime controller: IMPLEMENTED / EXTERNAL_REVIEW_PASS
+Attempt 4: NOT_STARTED
 ```
 
-이 head 자체가 승인하는 사내 실행은 없다.
+### Implementation activation record
 
 ```text
-Authorized phase: NONE
-Runtime controller: NOT_IMPLEMENTED
-H0 execution: NOT_AUTHORIZED
+Date: 2026-09-02
+Authority: HUMAN_GATE_OWNER
+Decision: APPROVE_SEVEN_FILE_CONTROLLER_IMPLEMENTATION
+Implementation base SHA: e6fe7e3b00dd42311cb30d88472949b03d18a2aa
+Scope: exact seven implementation paths declared by this Task/controller
+Attempt 4 -Prepare / H0 / A1+ / T01 / merge: NOT_AUTHORIZED_BY_THIS_DECISION
+Next authority boundary: frozen exact runtime head requires separate Human approval
+```
+
+이 head의 실행 단계는 conditional이다. 새 exact PR head를 동결한 뒤 Human이 그 full SHA와
+capability/risk handoff를 별도로 승인하기 전에는 실행할 수 없다.
+
+```text
+Authorized phase: ATTEMPT_4_PREPARE_AND_H0_RUNTIME_AFTER_EXACT_HEAD_HUMAN_APPROVAL
+Runtime controller: IMPLEMENTED / EXTERNAL_REVIEW_PASS
+H0 execution: NOT_AUTHORIZED_UNTIL_EXACT_HEAD_HUMAN_APPROVAL
 A1+ / T01 / merge: HOLD
 ```
 
-이번 Human 결정은 A0 Evidence 기록과 H0 설계만 승인했다. 이후 runtime controller
-구현, 새 exact PR head 승인과 source verification 없이는 Attempt 4 H0를 시작하지
-않는다. 아래 Attempt 3 A0 script/contract는 보존된 Evidence의 의미를 설명하는
-historical asset이며 새 head에서 다시 실행할 권한이 아니다.
+기존 Human 결정은 A0 Evidence 기록과 H0 설계까지만 승인했고, 위 별도 결정은 bounded
+controller 구현만 승인했다. 이 구현 head도 새 exact PR head 승인과 source verification
+없이는 Attempt 4 `-Prepare` 또는 H0를 시작하지 않는다. 아래 Attempt 3 A0 script/contract는
+보존된 Evidence의 의미를 설명하는 historical asset이며 새 head에서 다시 실행할 권한이 아니다.
 
 A0 PASS와 H0 설계 승인은 T00 PASS, T02 internal PASS, PR merge 승인 또는 H0 실행
 승인이 아니다. 이전의 “A0부터 A3까지 동일 PowerShell process 유지” 계약은 폐기한다.
@@ -127,23 +144,29 @@ Attempt 2 A0는 dependency install/typecheck/build를 수행한 뒤
 - `company/docs/CLAUDE_CODE_ISOLATION.md`
 - `company/scripts/t00-a0-preflight.ps1`
 - `company/tasks/v1-s1/V1-S1-T02-WRAPPER-SAFE-CONFIG-SAVE.md`
+- `company/scripts/t00-runtime-controller.ps1`
 - `company/scripts/t00-safe-config-save.mjs`
 - `packages/cli/src/cli.ts` — read-only
+- `packages/core/src/runtime/app-paths.ts` — read-only
 - `packages/core/src/config/constants.ts` — read-only
 - `packages/core/src/config/config-repository.ts` — read-only
 - `packages/core/src/config/default-config.ts` — read-only
+- `packages/core/src/storage/migration.ts` — read-only
 - `packages/core/src/web/management-server.ts` — read-only
+- `packages/core/src/gateway/application/gateway-service.ts` — read-only
 - `packages/core/src/gateway/runtime-change.ts` — read-only
+- `packages/core/src/platform/windows-app-discovery.ts` — read-only
+- `packages/core/src/platform/windows-system.ts` — read-only
 
 T02 Task/helper와 CCR runtime source는 historical A0에서 실행하거나 해석하지 않았다.
-위 추가 경로는 이번 H0 설계의 source 근거이며, future controller implementation head는
-실제 executable contract에 필요한 exact knowledge와 artifact를 다시 동결해야 한다.
+위 경로는 Attempt 4 source restoration에 필요한 exact knowledge이며, execution 전 candidate
+head에서 다시 읽고 artifact identity를 검증한다.
 
 ## Attempt 3 A0 contract — historical
 
 아래 `Exact handoff tuple`부터 `Human-readable Evidence`까지는 exact head
 `e16b4a90c7f5f7171905ad7c2993e8dcf6781353`에서 실행된 Attempt 3 A0 계약을
-Evidence와 함께 보존한다. 현재 design head 또는 future Attempt 4의 실행 권한이 아니며,
+Evidence와 함께 보존한다. 현재 implementation/runtime head 또는 future Attempt 4의 실행 권한이 아니며,
 hard-coded A0 script를 새 head에서 다시 실행하지 않는다.
 
 ## Attempt 3 exact handoff tuple — historical
@@ -470,9 +493,9 @@ raw error text는 외부로 반환하지 않는다.
 
 ```text
 H0 design: APPROVED
-H0 execution: NOT_AUTHORIZED
-Executable procedure in this head: NONE
-Runtime controller: NOT_IMPLEMENTED
+H0 execution: CONDITIONAL / EXACT_HEAD_HUMAN_APPROVAL_REQUIRED
+Executable procedure in this head: REVIEWED_CONTROLLER / NOT_YET_HUMAN_AUTHORIZED
+Runtime controller: IMPLEMENTED / EXTERNAL_REVIEW_PASS
 A1+: HOLD
 ```
 
@@ -523,9 +546,10 @@ directory여야 하며 inherited broad access를 제거하고 current Windows id
 secret은 사외 Evidence에 넣지 않는다. 관련 client가 다시 열리거나 같은 account 동시
 사용 또는 owner 불명이 생기면 H0는 무효이며 runtime을 시작하지 않는다.
 
-### Future controller contract
+### Runtime controller contract
 
-구현은 별도 승인 대상이다. Bounded implementation write scope는 다음 일곱 파일뿐이다.
+구현은 이 head에서 외부 검토를 통과했다. Bounded implementation write scope는 다음 일곱
+파일뿐이다.
 
 ```text
 company/scripts/t00-runtime-controller.ps1
@@ -548,16 +572,16 @@ Authorized phase: ATTEMPT_4_PREPARE_AND_H0_RUNTIME_AFTER_EXACT_HEAD_HUMAN_APPROV
 Attempt 4: NOT_STARTED until that frozen exact head receives Human approval
 ```
 
-Future implementation handoff는 이 current design head의 frozen exact SHA를
+Implementation handoff는 prior design head의 frozen exact SHA를
 `implementation_base_sha`로 제공한다. Final runtime Task도 그 값을 기록하고 controller는
 base가 runtime head의 ancestor인지, `implementation_base_sha..runtime_head` changed-path가
 위 일곱 파일 안에만 있는지 검증한다. 이 bounded delta 검증은 main-wide Task
 `allowed_paths` containment와 `97b73a9...` protected equality를 대체하지 않고 추가한다.
 
 이 conditional phase는 final runtime head가 외부 검토를 통과하고 Human이 frozen exact SHA,
-capability matrix와 npm network/lifecycle/current-user risk를 명시적으로 승인한 뒤에만 실행
-가능하다. 승인 정보를 넣기 위해 freeze 뒤 docs commit을 추가하지 않는다. 현재 design
-head의 `authorized_phase: NONE`은 바뀌지 않는다.
+capability matrix, npm network/lifecycle/current-user risk와 Stock `getAppInfo` residual risk를
+명시적으로 승인한 뒤에만 실행 가능하다. 승인 정보를 넣기 위해 freeze 뒤 docs commit을 추가하지 않는다. 이 head의
+`authorized_phase`는 그 조건을 기록한 것이며, 그 자체가 exact-head Human 실행 승인은 아니다.
 
 - `-Prepare`는 새 nonce에서 exact main/candidate/instruction/product identity, candidate
   changed-path가 Task `allowed_paths` 안에만 있다는 것, protected product/source path가
@@ -566,20 +590,34 @@ head의 `authorized_phase: NONE`은 바뀌지 않는다.
   `97b73a9...` archive에 `npm ci --audit=false --fund=false --ignore-scripts=false`, direct
   typecheck와 build를 한 번씩 수행한다. Existing shared checkout, CCR service/UI/config는
   건드리지 않는다.
+- Source verifier가 준비하는 `%LOCALAPPDATA%\CompanyCCR\validation-workspaces\<32hex>`는
+  fresh exact nonce이며 protected ACL에 current Windows identity와 `SYSTEM`만 허용하고,
+  controller 진입 시에는 inherited private ACL의 `repo.git` 하나만 포함해야 한다.
+  Controller는 이 조건을 재검증하며 source/cache/temp child는 그 private root를 상속한다.
+- Preparation의 git/npm/typecheck/build native child는 timeout/fault 시 process-tree cleanup을
+  시도한다. 종료가 증명되지 않으면 `CLEAN=N`과 manual process review를 보고하고 H0/run을
+  금지한다. 정상 종료나 child start 전 차단만 `CLEAN=P`로 보고할 수 있다.
+  Workspace identity를 얻은 뒤 실패하면 sanitized 32-hex workspace ID와 local-write,
+  npm-ci invocation, typecheck, build 각각의 attempted 여부도 readable summary에 남겨
+  Human이 broad cleanup 없이 exact nonce를 후속 검토할 수 있게 한다. Network와 lifecycle은
+  실행 사실로 추정하지 않고 `ALLOW|NONE` permission과 `NOT_OBSERVED` actual effect를 별도로
+  표시한다.
 - Preparation 전 Human handoff가 npm network/lifecycle current-user 실행과 residual
   credential-exposure risk를 다시 승인하고 같은 Windows account 동시 사용 `NO`를
   확인해야 한다. Local/network/lifecycle effect는 A0와 같은 truthful semantics로 보고한다.
 - `-Prepare`는 isolated cache/temp를 execution root 밖에 두고, prepared execution root의
   tracked source, `packages/**/dist`, CLI `models.json`과 whole `node_modules` runtime tree를
   relative path/type/size/content identity로 local bounded manifest에 묶는다. Unknown
-  reparse point는 금지하며 exact npm workspace junction만 resolved target이 같은 nonce
-  내부일 때 허용하고 그 target tree를 별도로 fingerprint한다.
+  reparse point는 금지하며 manifest allowlist의 exact npm workspace directory reparse
+  link만 resolved target이 같은 nonce 내부일 때 허용하고 그 target tree를 별도로
+  fingerprint한다.
 - Bound Node의 `require.resolve`로 `better-sqlite3`와 runtime dependency/native
   `better_sqlite3.node`가 nonce 안에 있음을 확인하고, in-memory DB open/close smoke를
   preparation에서 수행한다. Selected CLI cwd/model-catalog와 exact controller/helper blobs,
   package lock/toolchain도 manifest에 포함한다.
-- `-Prepare`는 exact workspace ID와 manifest digest를 bind한 한 줄 `-Run` command만
-  사내 화면에 반환한다. 그 command는 absolute Windows PowerShell 5.1 application을
+- `-Prepare`는 readable sanitized preparation summary와 함께, 실행 가능한 명령으로는
+  exact workspace ID와 manifest digest를 bind한 한 줄 `-Run` command만 사내 화면에
+  반환한다. 그 command는 absolute Windows PowerShell 5.1 application을
   `-NoProfile`로 시작한다. H2 입력을 위해 long-lived interactive process여야 하므로
   `-NonInteractive`는 쓰지 않는다. 그 same no-profile process가 inline bootstrap으로
   bounded regular non-reparse controller가 literal approved Git blob과 같은지 먼저
@@ -608,10 +646,23 @@ head의 `authorized_phase: NONE`은 바뀌지 않는다.
   시작한다. 기존 service 재사용은 fresh ownership PASS가 아니다.
 - parent `LOCALAPPDATA`를 즉시 복구하고 exact new service state/PID/start time,
   `getAppInfo`/`getServiceIdentity`와 Gateway `stopped`를 결합해 ownership을 증명한다.
-- Stock start/stop과 모든 native child stdout/stderr는 size/time bounded memory로 capture해
-  allowlisted fresh/reuse/result state만 parse하고 raw console로 전달하지 않는다. Tokenized
-  management URL, PID, path, token과 raw error는 terminal 또는 sanitized Evidence에 출력하지
-  않는다.
+- Company controller가 직접 시작하는 Stock start/stop, build/helper와 cleanup native child의
+  stdout/stderr는 size/time bounded memory로 capture하고 raw console로 전달하지 않는다.
+  Stock start/stop stdout은 신뢰하거나 parse하지 않으며 exit status와 독립적인
+  service-state/PID/listener/RPC/postcondition으로 판단한다. Helper output만 exact allowlisted
+  capsule로 parse한다. Tokenized management URL, PID, path, token과 raw error는 terminal 또는
+  sanitized Evidence에 출력하지 않는다.
+- Pinned Stock `getAppInfo`의 Windows app discovery는 daemon 내부에서 absolute System
+  `powershell.exe`와 `where.exe`를 시작하며 PowerShell에 `-ExecutionPolicy Bypass`를 준다.
+  이 descendant는 Company controller가 직접 시작한 child가 아니므로 controller가 종료
+  시간이나 output을 직접 제한할 수 없다. Controller는 canonical machine `SystemRoot`/
+  `windir`, 두 executable의 regular/non-reparse identity와 hash를 bind하고 RPC 전체 시간을
+  제한하지만, timeout 뒤에도 daemon descendant 종료까지 증명할 수 없으면 stock stop이나
+  임의 kill 대신 manual recovery로 차단한다. CCR `packages/**`를 수정하지 않기로 한 Human
+  결정에 따른 reviewed residual risk이며 `ConfirmStockGetAppInfoResidualRisk` 없이는
+  `-Prepare`가 시작되지 않는다. T02 helper도 각 invocation의 첫 RPC로 `getAppInfo`를
+  호출하므로 helper runner timeout/fault/truncation 또는 sanitized `RPC_FAILURE`는 같은
+  sticky uncertainty로 처리하고 controller가 stock stop을 시도하지 않는다.
 - T02 helper default no-`saveConfig` preflight를 한 번 실행한다. 이는 storage
   initialization/migration 가능성이 있어 read-only라고 부르지 않는다.
 - 첫 runtime Node/service 직전, default preflight helper spawn 직전과 `--apply` helper spawn
@@ -638,32 +689,50 @@ head의 `authorized_phase: NONE`은 바뀌지 않는다.
   같은 stock CLI로 stop한다. 그 뒤 captured PID death, service state/backup 부재,
   Gateway stop과 source/targeted real invariant의 `AFTER=SAME`을 별도로 증명한다. 모든
   service-start 경로에서 sandbox cleanup 여부를 결정하되, captured PID `DEAD`와 service/
-  ownership 부재가 모두 증명된 경우에만 manifest의 same exact nonce/root/ACL/non-reparse/
-  entry set과 다시 대조한다. 그때만 junction을 따라가지 않고 그 child 하나를 삭제해
-  absence를 증명한다. Stop skip/failure, surviving PID, ownership uncertainty 또는 sandbox
-  검증·삭제·absence failure에서는 sandbox를 건드리지 않고 manual recovery용으로 보존하며
-  PASS를 금지한다.
+  ownership 부재가 모두 증명된 경우에만 manifest-bound exact nonce/root, 현재
+  current-identity+`SYSTEM` private ACL policy, non-reparse 상태와 연속 두 번의 stable tree
+  scan을 확인한다. 그때만 reparse link를 따라가지 않고 그 child 하나를 삭제해 absence를
+  증명한다. Stop skip/failure, surviving PID 또는 ownership uncertainty에서는 삭제하지
+  않는다. Sandbox validation failure도 destructive boundary 전이면 untouched이며, delete
+  또는 final absence I/O failure는 partial/unknown으로 보고 manual recovery가 필요하다.
+  어느 경우든 PASS를 금지한다.
   Foreign/unknown ownership은 임의 stop/kill하지 않고 manual recovery로 넘기며 PASS를
   금지한다.
 - cleanup과 environment restoration이 safe한 뒤 controller가 `H2_READY`만 출력하고 같은
   plain-PowerShell process에서 기다린다. Human이 일반 `claude` auth/model visibility와
-  Claude Desktop smoke를 수행한 뒤 exact PASS/FAIL 세 값과 recovery 여부만 입력하면
-  controller가 final capsule을 만든다. Sonnet을 다시 열지 않는다. Manual recovery,
+  Claude Desktop smoke를 수행한 뒤 해당 client를 다시 닫고
+  `H2|AUTH=P|MODELS=P|DESKTOP=P|CLIENTS=CLOSED|RECOVERY=N`을 입력하면 controller가
+  current-account relevant writer 부재를 재확인한 뒤 final capsule을 만든다. Sonnet을
+  다시 열지 않는다. Manual recovery,
   surviving PID, cleanup uncertainty, invariant change 또는 H2 failure는 PASS가 아니다.
+  H2 PASS token 직후 targeted Enterprise/Claude-3p/Process/User/Machine/command invariant를
+  다시 측정하며, 이 재오픈 뒤 비교도 `SAME`이어야 한다.
 - H2의 `RECOVERY`는 runtime 중 manual recovery가 필요했거나 수행됐는지만 기록하며 backup
   삭제 권한이 아니다. Post-Gate cleanup 승인은 Evidence 검토 뒤 내리는 별도 destructive
   action 결정이므로 두 값을 합치지 않는다.
 - 한번 만들어진 Recovery backup은 결과와 무관하게 runtime/H2 및 Human Gate review가
   끝날 때까지 `RETAINED`로 보존하며, 이 상태에서도 runtime PASS Evidence를 낼 수 있다. `-Run`은 자동
   삭제하지 않고 exact manifest에 bind된 별도 post-Gate cleanup command만 사내에 남긴다.
+  H2 성공 직후 PASS/report/ticket을 계산하기 전에 manifest digest, private ACL, exact entry
+  set과 file bytes를 다시 검증하며 불일치하면 PASS를 금지하고 manual recovery로 전환한다.
+  PASS report/ticket만으로 post-Gate 삭제 권한을 만들지 않는다. Report/ticket과 cleanup
+  command를 모두 구성하고 ticket ACL을 검증한 뒤, 두 digest를 묶은
+  `run-success.marker`를 final durable state transition으로 원자 생성한다. 그 다음에는
+  fixed sanitized PASS output만 내며 output consumer failure가 이미 committed된 결과를
+  BLOCKED capsule로 뒤집지 않는다. Cleanup mode는 이 marker까지 시작 시점과 destructive
+  boundary 직전에 exact 재검증한다. Marker가 없거나 다르면 삭제하지 않는다.
   Human Gate가 `RECOVERY=N`과 더 이상 backup이 필요 없음을 명시적으로 승인한 뒤에만
   absolute PS5.1 `-NoProfile` bootstrap을 거친 controller cleanup mode를 실행한다. 삭제
   직전 approved recovery root의 동일한 exact-nonce child인지 다시 resolve하고, directory와
   모든 entry가 regular non-reparse이며 original manifest/ACL owner와 같고 bounded manifest
-  path만 포함하는지 확인한다. 그 exact directory 하나만 junction을 따라가지 않고 삭제한
-  뒤 absence를 증명한다. 확인·삭제·absence 중 하나라도 실패하거나 mutation/cleanup이
-  불명확하면 보존하며 T00 `ACCEPTED`/merge를 금지한다. 외부 Evidence에는 path/hash 없이
-  compact `B=N|R|D`만 포함하고, `N`은 backup 생성 전 결과에만 허용한다. Manual recovery는
+  path만 포함하는지 확인한다. 그 exact directory 하나만 reparse link를 따라가지 않고
+  삭제한 뒤 absence를 증명한다. Destructive boundary 전 검증 실패면 backup을 삭제하지
+  않는다. Delete 또는 final absence I/O failure면 일부가 삭제됐을 수 있으므로
+  partial/unknown으로 보고 T00 `ACCEPTED`/merge를 금지한다. 외부 Evidence에는 path/hash 없이
+  compact `B=N|R|D`만 포함하고, `N`은 backup 생성 전 결과에만 허용한다. Cleanup failure의
+  `B=R`은 recovery material이 완전히 삭제됐다고 증명하지 못했다는 뜻이며, 중간 I/O 실패
+  뒤 byte-perfect 원본 보존을 주장하지 않는다. Partial/unknown이면 T00 acceptance/merge를
+  계속 금지한다. Manual recovery는
   PASS 금지와 allowlisted failure category로 나타낸다.
 
 Attempt 3 A0 workspace `4b5fc32468f4a9c103af7686987e9b26`은 Evidence review용으로
@@ -707,9 +776,11 @@ T00R|PASS|A4|H=<12hex>|SRC=P|PREP=P|H0=P|SAVE=1|INV=S/S|CLEAN=P|H2=P|B=R|RAW=N
 ```
 
 BLOCKED/FAIL은 `T00R|BLOCKED|A4|H=<12hex>|P=<phase>|C=<allowlisted>|B=<N|R>|CLEAN=<P|N>|RAW=N`
-형태로 제한한다. Post-Gate cleanup은 `T00C|PASS|H=<12hex>|B=D|RAW=N`만 옮긴다. Readable
-internal explanation은 유지하되 외부에는 actual path/PID/token/hash/config/raw log를
-옮기지 않는다.
+형태로 제한한다. Preparation에서 `CLEAN=N`이면 native process-tree 종료가 증명되지 않은
+것이므로 manual process review가 필요하다. Post-Gate cleanup은
+`T00C|PASS|H=<12hex>|B=D|RAW=N`만 옮긴다. PASS/BLOCKED 모두 fixed sanitized readable
+summary를 먼저 표시하고 compact capsule을 함께 남기되, 외부에는 actual
+path/PID/token/hash/config/raw log를 옮기지 않는다.
 
 ### Proportionality review
 
@@ -815,12 +886,12 @@ Candidate / instruction SHA: pending exact runtime-controller PR head
 Candidate role: validation_overlay
 Tested product SHA: 97b73a9f4e1fb23d406bb987d0785cefa1f99966
 Prior A0 checkpoint: Attempt 3 at e16b4a90c7f5f7171905ad7c2993e8dcf6781353
-A0 reuse: NOT_AUTOMATIC / PENDING_EXPLICIT_HUMAN_DECISION
+A0 reuse: NO / FRESH_NONCE_PREPARATION_REQUIRED
 Current result: NOT_STARTED
 H0/A1+: NOT_STARTED
-Runtime authorization: PENDING IMPLEMENTATION + NEW EXACT-HEAD HUMAN APPROVAL
+Runtime authorization: PENDING NEW EXACT-HEAD HUMAN APPROVAL
 ```
 
 ## Human decision
 
-`RETRY — RECORD ATTEMPT 3 A0; APPROVE H0 DESIGN ONLY; IMPLEMENTATION/H0 EXECUTION/A1+ HOLD`
+`PENDING — CONTROLLER EXTERNAL PASS; ATTEMPT 4/H0/A1+ REQUIRE NEW EXACT-HEAD HUMAN APPROVAL`

@@ -27,7 +27,7 @@ current:
   stage: V1-S1
   task_id: V1-S1-T00
   task_path: company/tasks/v1-s1/V1-S1-T00-CCR-RUNTIME-SANDBOX.md
-  status: in_progress
+  status: ready_internal
 
 next:
   task_id: V1-S1-T01
